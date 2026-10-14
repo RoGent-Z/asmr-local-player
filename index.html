@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="library-source" content="local-files">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>本地 ASMR 播放器</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main id="app" class="app">
+    <div class="veil" aria-hidden="true"></div>
+    <canvas id="voiceAtmosphere" class="voice-atmosphere" aria-hidden="true"></canvas>
+    <canvas id="leftSpectrum" class="spectrum-canvas spectrum-left" aria-hidden="true"></canvas>
+    <canvas id="centerSpectrum" class="center-spectrum" aria-hidden="true"></canvas>
+    <canvas id="rightSpectrum" class="spectrum-canvas spectrum-right" aria-hidden="true"></canvas>
+
+    <header class="topbar">
+      <button id="menuButton" class="icon-button" type="button"
+        aria-label="打开作品库" aria-expanded="false">☰</button>
+      <div class="now-playing">
+        <div id="workTitle" class="work-title">本地 ASMR 播放器</div>
+        <div id="trackTitle" class="track-title">正在扫描本地作品…</div>
+      </div>
+      <div id="subtitleStatus" class="status-pill">本地模式</div>
+      <button id="openFolderButton" class="text-button" type="button">打开文件夹</button>
+      <button id="dialogueButton" class="text-button" type="button"
+        aria-label="打开全部台词" aria-expanded="false">台词</button>
+    </header>
+
+    <input id="folderInput" class="file-input" type="file" webkitdirectory multiple aria-label="选择本机曲库文件夹" tabindex="-1">
+    <section id="libraryWelcome" class="library-welcome" aria-label="打开本机曲库" hidden>
+      <div class="eyebrow">YOUR FILES · YOUR PLAYER</div>
+      <h1>把声音，留在自己这里。</h1>
+      <p>选择曲库文件夹，即可播放 MP3 / WAV，<br>同步字幕、双音轨与动态频谱。</p>
+      <button id="chooseFolderButton" class="text-button choose-folder-button" type="button">选择曲库文件夹</button>
+      <p id="importStatus" class="import-status" role="status">文件仅在此浏览器读取，不会上传。<br>刷新后重新选择同一文件夹，即可恢复进度。</p>
+    </section>
+
+    <div id="drawerScrim" class="drawer-scrim" aria-hidden="true"></div>
+    <aside id="drawer" class="drawer" aria-label="作品与音轨">
+      <div class="drawer-heading">
+        <div>
+          <div class="eyebrow">LOCAL LIBRARY</div>
+          <h1>作品与音轨</h1>
+        </div>
+        <button id="closeDrawerButton" class="icon-button" type="button" aria-label="关闭作品库">×</button>
+      </div>
+      <div id="library" class="library"></div>
+    </aside>
+
+    <aside id="dialogueDrawer" class="dialogue-drawer" aria-label="全部台词">
+      <div class="drawer-heading">
+        <div>
+          <div class="eyebrow">DIALOGUE</div>
+          <h1>全部台词</h1>
+        </div>
+        <button id="closeDialogueButton" class="icon-button" type="button"
+          aria-label="关闭全部台词">×</button>
+      </div>
+      <div id="dialogueList" class="dialogue-list"></div>
+    </aside>
+
+    <section class="subtitle-stage" aria-live="off">
+      <div id="leftSubtitles" class="subtitle-column subtitle-left"></div>
+      <div id="rightSubtitles" class="subtitle-column subtitle-right"></div>
+      <div id="centerSubtitles" class="subtitle-column subtitle-center"></div>
+    </section>
+
+    <section id="controls" class="controls" aria-label="播放器控制">
+      <div class="progress-row">
+        <span id="currentTime">0:00</span>
+        <input id="progress" class="progress" type="range" min="0" max="1000" value="0" aria-label="播放进度">
+        <span id="duration">0:00</span>
+      </div>
+      <div class="control-row">
+        <div class="control-cluster">
+          <button id="previousButton" class="control-button" type="button" aria-label="上一轨">|◀</button>
+          <button id="playButton" class="play-button" type="button" aria-label="播放">▶</button>
+          <button id="nextButton" class="control-button" type="button" aria-label="下一轨">▶|</button>
+        </div>
+        <div class="control-cluster secondary-controls">
+          <label class="compact-control">
+            <span>音量</span>
+            <input id="volume" type="range" min="0" max="1" step="0.01" value="1" aria-label="音量">
+          </label>
+          <label class="compact-control">
+            <span>倍速</span>
+            <select id="rate" aria-label="播放倍速">
+              <option value="0.75">0.75×</option>
+              <option value="1" selected>1.0×</option>
+              <option value="1.25">1.25×</option>
+              <option value="1.5">1.5×</option>
+              <option value="2">2.0×</option>
+            </select>
+          </label>
+          <button id="fullscreenButton" class="control-button" type="button" aria-label="全屏">⛶</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="toast" class="toast" role="status"></div>
+    <audio id="audioLeft" preload="metadata"></audio>
+    <audio id="audioRight" preload="metadata"></audio>
+  </main>
+
+  <script type="module" src="./js/app.mjs"></script>
+</body>
+</html>
