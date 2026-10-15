@@ -4,11 +4,17 @@ export const DEFAULT_SPECTRUM_PALETTE = Object.freeze([
   '#78d7ff',
 ]);
 
-export function getSpectrumChannelPlan(paired) {
-  if (paired) {
+export function getSpectrumChannelPlan(paired, listeningMode = 'binaural') {
+  if (paired && listeningMode === 'split') {
     return {
       left: { source: 'leftMono', channel: 0 },
       right: { source: 'rightMono', channel: 0 },
+    };
+  }
+  if (paired) {
+    return {
+      left: { source: 'left', channels: [0, 1] },
+      right: { source: 'right', channels: [0, 1] },
     };
   }
   return {
@@ -17,16 +23,28 @@ export function getSpectrumChannelPlan(paired) {
   };
 }
 
-export function getPlaybackRoutingPlan(paired, dialoguePan = 0) {
+export function getPlaybackRoutingPlan(paired, modeOrLegacyPan = 'binaural', mode) {
+  // Numeric second arguments from the former subtitle-pan API remain accepted.
+  // Dialogue focus changes visuals only; original recordings keep their scene.
+  const listeningMode = mode ?? (typeof modeOrLegacyPan === 'string' ? modeOrLegacyPan : 'binaural');
   if (!paired) {
     return {
       left: {
         source: 'left',
         mode: 'stereo',
-        pan: Math.max(-1, Math.min(1, Number(dialoguePan) || 0)),
+        pan: 0,
+        gain: 1,
         analyser: ['leftChannel', 'rightChannel'],
       },
       right: null,
+    };
+  }
+  if (listeningMode !== 'split') {
+    const leftGain = listeningMode === 'right-only' ? 0 : listeningMode === 'left-only' ? 1 : 0.5;
+    const rightGain = listeningMode === 'left-only' ? 0 : listeningMode === 'right-only' ? 1 : 0.5;
+    return {
+      left: { source: 'left', mode: 'stereo', pan: 0, gain: leftGain, analyser: ['leftChannel', 'rightChannel'] },
+      right: { source: 'right', mode: 'stereo', pan: 0, gain: rightGain, analyser: ['leftChannel', 'rightChannel'] },
     };
   }
   return {

@@ -1,8 +1,7 @@
-import {
-  buildAlignment,
-  findCommonAnchors,
-  mapAndMergeCues,
-} from './alignment.mjs';
+import { sourceToPresentation } from './alignment.mjs';
+import { buildTrackPlayback } from './playback-mode.mjs';
+import { createAiWorkbench } from './ai-workbench.mjs';
+import { displaySourceCues } from './transcript.mjs';
 import {
   activeDialogueIds,
   buildDialogueItems,
@@ -54,6 +53,8 @@ const elements = {
   leftSubtitles: document.querySelector('#leftSubtitles'),
   library: document.querySelector('#library'),
   libraryWelcome: document.querySelector('#libraryWelcome'),
+  listeningMode: document.querySelector('#listeningMode'),
+  syncMode: document.querySelector('#syncMode'),
   menuButton: document.querySelector('#menuButton'),
   nextButton: document.querySelector('#nextButton'),
   openFolderButton: document.querySelector('#openFolderButton'),
@@ -91,6 +92,10 @@ let lastPersistAt = 0;
 let localLibrary = null;
 let importRequest = 0;
 let trackReady = false;
+let preparedTrack = null;
+let aiDocument = null;
+let aiDisplayMode = 'bilingual';
+let aiWorkbench = null;
 const libraryMode = document.querySelector('meta[name="library-source"]')?.content ?? 'local-files';
 let activeDialogueItemIds = new Set();
 const dialogueNodes = new Map();
@@ -166,6 +171,67 @@ function currentTrack() {
   return currentWork()?.tracks[trackIndex] ?? null;
 }
 
+function getAiContext() {
+  if (!trackReady || !preparedTrack) return null;
+  const track = currentTrack();
+  const work = currentWork();
+  const sources = track.sources.map((source) => ({
+    ...source, name: source.id, blob: localLibrary?.getFile(source.audioUrl) ?? null,
+    cues: (preparedTrack.sourceCues[source.id] ?? []).map((cue, index) => ({
+      id: `${source.id}:${index}`, start: cue.start, end: cue.end, text: cue.text,
+    })),
+  }));
+  const trackKey = JSON.stringify([work.id, track.id, ...sources.map((source) => [source.id, source.blob?.size ?? 0, source.blob?.lastModified ?? 0])]);
+  return { trackKey, title: `${work.title} · ${track.title}`, sources };
+}
+
+function aiPresentationCues(doc, mode) {
+  if (!preparedTrack) return [];
+  return doc.sources.flatMap((source) => {
+      const side = currentTrack().mode === 'paired' && source.side === 'right' ? 'right' : 'left';
+      return displaySourceCues(source, mode).map((cue) => ({
+        ...cue,
+        start: sourceToPresentation(preparedTrack.alignment.sides[side], cue.start, 'next'),
+        end: sourceToPresentation(preparedTrack.alignment.sides[side], cue.end, 'previous'),
+      })).filter((cue) => cue.end > cue.start);
+    }).sort((a, b) => a.start - b.start);
+}
+
+function refreshTrackCues() {
+  if (!preparedTrack) return;
+  if (aiDocument) {
+    cues = aiPresentationCues(aiDocument, aiDisplayMode);
+    elements.subtitleStatus.textContent = cues.length ? 'AI 字幕已应用' : 'AI 处理中';
+  } else {
+    cues = preparedTrack.cues;
+    elements.subtitleStatus.textContent = cues.length
+      ? preparedTrack.paired ? elements.syncMode.value === 'subtitle' ? '双 VTT 已合并' : '原声 · 双轨字幕' : '字幕已同步'
+      : '无字幕';
+  }
+  dialogueItems = buildDialogueItems(cues);
+  renderDialogueList(); clearSubtitles();
+  renderActiveSubtitles(player.currentTime()); updateActiveDialogue(player.currentTime(), true);
+}
+
+function configureListening() {
+  const track = currentTrack();
+  if (!track) return;
+  const paired = track.mode === 'paired';
+  const left = track.sources.find((source) => source.side === 'left') ?? track.sources[0];
+  const right = track.sources.find((source) => source.side === 'right');
+  spectrum.configure({ paired, listeningMode: paired ? elements.listeningMode.value : 'binaural', leftPalette: left?.hairPalette, rightPalette: right?.hairPalette });
+  elements.syncMode.disabled = !paired;
+  for (const option of elements.listeningMode.options) option.disabled = !paired && option.value !== 'binaural';
+  if (!paired) elements.listeningMode.value = 'binaural';
+}
+
+aiWorkbench = createAiWorkbench({
+  getContext: getAiContext,
+  onApply: (doc, mode) => { aiDocument = doc; aiDisplayMode = mode; refreshTrackCues(); },
+  onRestore: () => { aiDocument = null; refreshTrackCues(); },
+  onOpenChange: (open) => { if (open) { setActiveDrawer(null); window.clearTimeout(hideTimer); } showUi(); },
+});
+
 function formatTime(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
   const whole = Math.floor(seconds);
@@ -202,7 +268,7 @@ function setActiveDrawer(nextDrawer) {
 
 function scheduleHide() {
   window.clearTimeout(hideTimer);
-  if (!player.paused() && activeDrawer === null) {
+  if (!player.paused() && activeDrawer === null && !aiWorkbench?.isOpen()) {
     hideTimer = window.setTimeout(() => {
       elements.app.classList.add('ui-hidden');
     }, 3000);
@@ -667,16 +733,12 @@ async function prepareTrack(track, requestId) {
     const rightParsed = subtitleResults[1].status === 'fulfilled'
       ? subtitleResults[1].value
       : { cues: [] };
-    const anchors = findCommonAnchors(leftParsed.cues, rightParsed.cues);
-    const alignment = buildAlignment({
-      leftDuration,
-      rightDuration,
-      anchors,
-    });
+    const playback = buildTrackPlayback({ leftDuration, rightDuration, leftCues: leftParsed.cues, rightCues: rightParsed.cues, paired, syncMode: elements.syncMode.value });
     return {
-      alignment,
+      ...playback,
+      leftDuration, rightDuration,
+      sourceCues: { [leftSource.id]: leftParsed.cues, [rightSource.id]: rightParsed.cues },
       paired,
-      cues: mapAndMergeCues(leftParsed.cues, rightParsed.cues, alignment),
       subtitlesAvailable: leftParsed.cues.length + rightParsed.cues.length > 0,
     };
   }
@@ -684,13 +746,11 @@ async function prepareTrack(track, requestId) {
   const parsed = subtitleResults[0].status === 'fulfilled'
     ? subtitleResults[0].value
     : { cues: [] };
-  const alignment = buildAlignment({
-    leftDuration,
-    rightDuration: 0,
-    anchors: [],
-  });
+  const playback = buildTrackPlayback({ leftDuration, leftCues: parsed.cues });
   return {
-    alignment,
+    ...playback,
+    leftDuration, rightDuration: 0,
+    sourceCues: { [leftSource.id]: parsed.cues },
     paired: false,
     cues: parsed.cues,
     subtitlesAvailable: parsed.cues.length > 0,
@@ -707,6 +767,8 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
   persistCurrent();
   player.pause();
   trackReady = false;
+  preparedTrack = null; aiDocument = null;
+  aiWorkbench?.trackChanged();
   spectrum.reset();
   const graphPromise = autoplay
     ? spectrum.ensureAudioGraph()
@@ -731,7 +793,7 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
   elements.workTitle.textContent = work.title;
   elements.trackTitle.textContent = track.title;
   elements.subtitleStatus.textContent = '载入中';
-  document.title = `${track.title} · 本地 ASMR`;
+  document.title = `${track.title} · ASMR v0.02`;
   const semanticKey = trackProfileKey(work.id, track.id);
   const visualReference = selectVisualReference(
     work.visualReferenceUrls,
@@ -750,6 +812,7 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
   try {
     const prepared = await prepareTrack(track, requestId);
     if (!prepared || requestId !== loadRequest) return;
+    preparedTrack = prepared;
     cues = prepared.cues;
     const semanticKey = trackProfileKey(work.id, track.id);
     const cachedProfile = semanticProfiles[semanticKey];
@@ -766,6 +829,7 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
       ?? null;
     spectrum.configure({
       paired: prepared.paired,
+      listeningMode: elements.listeningMode.value,
       leftPalette: leftSource?.hairPalette,
       rightPalette: rightSource?.hairPalette,
     });
@@ -779,15 +843,15 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
       rightEnabled: prepared.paired,
     });
     trackReady = true;
+    configureListening();
     spectrum.setSemanticFrame(
       semanticFrameAt(semanticTimeline, player.currentTime()),
     );
     spectrum.setDialogueFocus(dialoguePanTarget(cues, player.currentTime(), {
       paired: prepared.paired,
     }));
-    elements.subtitleStatus.textContent = prepared.subtitlesAvailable
-      ? prepared.paired ? '双 VTT 已合并' : '字幕已同步'
-      : '无字幕';
+    refreshTrackCues();
+    aiWorkbench.trackChanged();
     renderActiveSubtitles(player.currentTime());
     updateActiveDialogue(player.currentTime(), activeDrawer === 'dialogue');
     if (autoplay) {
@@ -814,7 +878,7 @@ function moveTrack(direction, autoplay = true) {
 function setLibraryAvailable(available) {
   elements.libraryWelcome.hidden = available;
   elements.app.classList.toggle('awaiting-library', !available);
-  for (const name of ['playButton', 'previousButton', 'nextButton', 'progress', 'volume', 'rate', 'dialogueButton']) {
+  for (const name of ['playButton', 'previousButton', 'nextButton', 'progress', 'volume', 'rate', 'dialogueButton', 'listeningMode', 'syncMode']) {
     elements[name].disabled = !available;
   }
 }
@@ -823,6 +887,8 @@ async function applyLibrary(data, nextLocalLibrary = null) {
   persistCurrent();
   player.pause();
   trackReady = false;
+  preparedTrack = null; aiDocument = null;
+  aiWorkbench?.trackChanged();
   player.load({ nextAlignment: null });
   ++loadRequest;
   spectrum.reset();
@@ -956,6 +1022,25 @@ elements.rate.addEventListener('change', () => {
   player.setRate(Number(elements.rate.value));
   persistCurrent();
 });
+elements.listeningMode.addEventListener('change', configureListening);
+elements.syncMode.addEventListener('change', () => {
+  if (!trackReady || !preparedTrack) return;
+  const playing = !player.paused();
+  const time = player.currentTime();
+  player.pause();
+  const track = currentTrack();
+  const left = track.sources.find((source) => source.side === 'left') ?? track.sources[0];
+  const right = track.sources.find((source) => source.side === 'right');
+  const playback = buildTrackPlayback({
+    leftDuration: preparedTrack.leftDuration, rightDuration: preparedTrack.rightDuration,
+    leftCues: preparedTrack.sourceCues[left.id], rightCues: right ? preparedTrack.sourceCues[right.id] : [],
+    paired: preparedTrack.paired, syncMode: elements.syncMode.value,
+  });
+  Object.assign(preparedTrack, playback);
+  player.load({ nextAlignment: playback.alignment, currentTime: Math.min(time, playback.alignment.duration), rate: Number(elements.rate.value), volume: Number(elements.volume.value), rightEnabled: preparedTrack.paired });
+  refreshTrackCues();
+  if (playing) playAudio();
+});
 elements.fullscreenButton.addEventListener('click', async () => {
   if (document.fullscreenElement) await document.exitFullscreen();
   else await document.documentElement.requestFullscreen();
@@ -966,7 +1051,7 @@ document.addEventListener('pointerdown', showUi, { passive: true });
 document.addEventListener('keydown', (event) => {
   showUi();
   const tagName = event.target?.tagName;
-  if (['INPUT', 'SELECT', 'BUTTON'].includes(tagName)) return;
+  if (['INPUT', 'SELECT', 'BUTTON', 'TEXTAREA'].includes(tagName) || aiWorkbench?.isOpen()) return;
   if (event.code === 'Space') {
     event.preventDefault();
     if (player.paused()) playAudio();
@@ -978,6 +1063,7 @@ document.addEventListener('keydown', (event) => {
   }
 });
 window.addEventListener('pagehide', (event) => {
+  aiWorkbench?.clearKeys();
   persistCurrent();
   player.pause();
   if (event.persisted) return;

@@ -516,6 +516,9 @@ export function createSpectrumRenderer({
   let audioContext = null;
   let leftAnalyser = null;
   let rightAnalyser = null;
+  let leftSecondaryAnalyser = null;
+  let rightSecondaryAnalyser = null;
+  let secondaryFrequencyData = new Uint8Array(128);
   let leftFrequencyData = new Uint8Array(128);
   let rightFrequencyData = new Uint8Array(128);
   let leftRoute = null;
@@ -524,6 +527,7 @@ export function createSpectrumRenderer({
   let animationFrame = 0;
   let sourcePlaying = { left: false, right: false };
   let paired = false;
+  let listeningMode = 'binaural';
   let supported = true;
   let palette = [...DEFAULT_SPECTRUM_PALETTE];
   let leftPalette = ['#ff78a8'];
@@ -534,7 +538,6 @@ export function createSpectrumRenderer({
   let lastCharacterColorUpdate = 0;
   let semanticFrame = QUIET_SEMANTIC_FRAME;
   let dialogueFocus = { side: 'center', pan: 0, dominance: 0 };
-  let smoothedDialoguePan = 0;
   let previousLeftFrequencyData = new Uint8Array(128);
   let previousRightFrequencyData = new Uint8Array(128);
 
@@ -557,7 +560,6 @@ export function createSpectrumRenderer({
     const monoOutput = audioContext.createGain();
     const directOutput = audioContext.createGain();
     const panner = audioContext.createStereoPanner();
-    const directPanner = audioContext.createStereoPanner();
 
     leftGain.gain.value = 0.5;
     rightGain.gain.value = 0.5;
@@ -576,8 +578,7 @@ export function createSpectrumRenderer({
     monoOutput.connect(panner);
     panner.connect(audioContext.destination);
     mediaSource.connect(directOutput);
-    directOutput.connect(directPanner);
-    directPanner.connect(audioContext.destination);
+    directOutput.connect(audioContext.destination);
 
     return {
       mediaSource,
@@ -588,7 +589,6 @@ export function createSpectrumRenderer({
       monoOutput,
       directOutput,
       panner,
-      directPanner,
     };
   }
 
@@ -612,7 +612,7 @@ export function createSpectrumRenderer({
     ];
     for (const input of inputs) {
       if (!input) continue;
-      for (const analyser of [leftAnalyser, rightAnalyser]) {
+      for (const analyser of [leftAnalyser, rightAnalyser, leftSecondaryAnalyser, rightSecondaryAnalyser]) {
         if (!analyser) continue;
         try {
           input.disconnect(analyser);
@@ -626,38 +626,33 @@ export function createSpectrumRenderer({
   function connectAnalysisChannels() {
     if (!leftRoute || !leftAnalyser || !rightAnalyser) return;
     disconnectAnalysisInputs();
-    const plan = getSpectrumChannelPlan(paired);
+    const plan = getSpectrumChannelPlan(paired, listeningMode);
     const sourceNodes = {
       left: leftRoute.splitter,
       right: rightRoute?.splitter ?? leftRoute.splitter,
       leftMono: leftRoute.monoBus,
       rightMono: rightRoute?.monoBus ?? leftRoute.monoBus,
     };
-    sourceNodes[plan.left.source].connect(
-      leftAnalyser,
-      plan.left.channel,
-      0,
-    );
-    sourceNodes[plan.right.source].connect(
-      rightAnalyser,
-      plan.right.channel,
-      0,
-    );
+    for (const [side, analysers] of [
+      ['left', [leftAnalyser, leftSecondaryAnalyser]],
+      ['right', [rightAnalyser, rightSecondaryAnalyser]],
+    ]) {
+      const channels = plan[side].channels ?? [plan[side].channel];
+      channels.forEach((channel, index) => {
+        sourceNodes[plan[side].source].connect(analysers[index], channel, 0);
+      });
+    }
   }
 
   function applyRoutingMode() {
     if (!leftRoute) return;
-    const plan = getPlaybackRoutingPlan(paired, smoothedDialoguePan);
-    leftRoute.directOutput.gain.value = plan.left.mode === 'stereo' ? 1 : 0;
+    const plan = getPlaybackRoutingPlan(paired, listeningMode);
+    leftRoute.directOutput.gain.value = plan.left.mode === 'stereo' ? plan.left.gain : 0;
     leftRoute.monoOutput.gain.value = plan.left.mode === 'mono-downmix' ? 1 : 0;
     leftRoute.panner.pan.value = plan.left.pan;
-    leftRoute.directPanner.pan.value = plan.left.mode === 'stereo'
-      ? plan.left.pan
-      : 0;
     if (rightRoute) {
-      rightRoute.directOutput.gain.value = 0;
-      rightRoute.directPanner.pan.value = 0;
-      rightRoute.monoOutput.gain.value = plan.right ? 1 : 0;
+      rightRoute.directOutput.gain.value = plan.right?.mode === 'stereo' ? plan.right.gain : 0;
+      rightRoute.monoOutput.gain.value = plan.right?.mode === 'mono-downmix' ? 1 : 0;
       rightRoute.panner.pan.value = plan.right?.pan ?? 1;
     }
   }
@@ -674,13 +669,18 @@ export function createSpectrumRenderer({
         audioContext = new AudioContextClass();
         leftAnalyser = makeAnalyser();
         rightAnalyser = makeAnalyser();
+        leftSecondaryAnalyser = makeAnalyser();
+        rightSecondaryAnalyser = makeAnalyser();
         leftFrequencyData = new Uint8Array(leftAnalyser.frequencyBinCount);
         rightFrequencyData = new Uint8Array(rightAnalyser.frequencyBinCount);
+        secondaryFrequencyData = new Uint8Array(leftAnalyser.frequencyBinCount);
         analysisSink = audioContext.createGain();
         analysisSink.gain.value = 0;
         analysisSink.connect(audioContext.destination);
         leftAnalyser.connect(analysisSink);
         rightAnalyser.connect(analysisSink);
+        leftSecondaryAnalyser.connect(analysisSink);
+        rightSecondaryAnalyser.connect(analysisSink);
 
         leftRoute = createSourceRoute(leftAudio, -1);
         if (rightAudio) {
@@ -709,15 +709,19 @@ export function createSpectrumRenderer({
   }
 
   function draw(time = performance.now()) {
-    const targetPan = paired ? 0 : Number(dialogueFocus.pan) || 0;
-    smoothedDialoguePan += (targetPan - smoothedDialoguePan) * 0.075;
-    if (Math.abs(smoothedDialoguePan) < 0.001) smoothedDialoguePan = 0;
-    applyRoutingMode();
-
-    const leftPlaying = sourcePlaying.left;
-    const rightPlaying = paired ? sourcePlaying.right : sourcePlaying.left;
+    const leftPlaying = sourcePlaying.left && !(paired && listeningMode === 'right-only');
+    const rightPlaying = paired
+      ? sourcePlaying.right && listeningMode !== 'left-only'
+      : sourcePlaying.left;
     readFrequencyData(leftAnalyser, leftFrequencyData, leftPlaying);
     readFrequencyData(rightAnalyser, rightFrequencyData, rightPlaying);
+    if (paired && listeningMode !== 'split') {
+      // Merge frequency magnitudes, never audio samples: antiphase content stays visible.
+      readFrequencyData(leftSecondaryAnalyser, secondaryFrequencyData, leftPlaying);
+      leftFrequencyData.set(mergeSpectrumData(leftFrequencyData, secondaryFrequencyData));
+      readFrequencyData(rightSecondaryAnalyser, secondaryFrequencyData, rightPlaying);
+      rightFrequencyData.set(mergeSpectrumData(rightFrequencyData, secondaryFrequencyData));
+    }
 
     const leftActive = leftPlaying && hasSpectrumEnergy(leftFrequencyData);
     const rightActive = rightPlaying && hasSpectrumEnergy(rightFrequencyData);
@@ -819,6 +823,9 @@ export function createSpectrumRenderer({
 
   function configure(options = {}) {
     paired = Boolean(options.paired);
+    listeningMode = ['binaural', 'split', 'left-only', 'right-only'].includes(options.listeningMode)
+      ? options.listeningMode
+      : 'binaural';
     leftPalette = Array.isArray(options.leftPalette) && options.leftPalette.length
       ? options.leftPalette
       : ['#ff78a8'];
@@ -896,7 +903,6 @@ export function createSpectrumRenderer({
     previousRightFrequencyData.fill(0);
     semanticFrame = QUIET_SEMANTIC_FRAME;
     dialogueFocus = { side: 'center', pan: 0, dominance: 0 };
-    smoothedDialoguePan = 0;
   }
 
   function destroy() {
@@ -906,6 +912,8 @@ export function createSpectrumRenderer({
     disconnectRoute(rightRoute);
     leftAnalyser?.disconnect();
     rightAnalyser?.disconnect();
+    leftSecondaryAnalyser?.disconnect();
+    rightSecondaryAnalyser?.disconnect();
     analysisSink?.disconnect();
     audioContext?.close();
   }

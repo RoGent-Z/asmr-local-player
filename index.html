@@ -6,8 +6,9 @@
   <meta name="color-scheme" content="dark">
   <meta name="library-source" content="local-files">
   <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
-  <title>本地 ASMR 播放器</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob: https:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="app-version" content="0.02">
+  <title>ASMR 原声播放器 · v0.02</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -28,6 +29,7 @@
       </div>
       <div id="subtitleStatus" class="status-pill">本地模式</div>
       <button id="openFolderButton" class="text-button" type="button">打开文件夹</button>
+      <button id="aiButton" class="text-button ai-entry" type="button" aria-haspopup="dialog">AI 字幕 <span class="version-tag">v0.02</span></button>
       <button id="dialogueButton" class="text-button" type="button"
         aria-label="打开全部台词" aria-expanded="false">台词</button>
     </header>
@@ -36,9 +38,9 @@
     <section id="libraryWelcome" class="library-welcome" aria-label="打开本机曲库" hidden>
       <div class="eyebrow">YOUR FILES · YOUR PLAYER</div>
       <h1>把声音，留在自己这里。</h1>
-      <p>选择曲库文件夹，即可播放 MP3 / WAV，<br>同步字幕、双音轨与动态频谱。</p>
+      <p>保留双耳细节，听见每一个人。<br>本机曲库 · 多人原声 · AI 识别与翻译</p>
       <button id="chooseFolderButton" class="text-button choose-folder-button" type="button">选择曲库文件夹</button>
-      <p id="importStatus" class="import-status" role="status">文件仅在此浏览器读取，不会上传。<br>刷新后重新选择同一文件夹，即可恢复进度。</p>
+      <p id="importStatus" class="import-status" role="status">播放仅在本机读取；AI 处理需自行填写接口并主动开始。<br>刷新后重新选择同一文件夹，即可恢复进度。</p>
     </section>
 
     <div id="drawerScrim" class="drawer-scrim" aria-hidden="true"></div>
@@ -72,6 +74,15 @@
     </section>
 
     <section id="controls" class="controls" aria-label="播放器控制">
+      <div class="listening-controls">
+        <label class="compact-control"><span>听音</span><select id="listeningMode" aria-label="听音模式">
+          <option value="binaural">原始双耳</option><option value="split">人物分侧</option>
+          <option value="left-only">仅左侧人物源</option><option value="right-only">仅右侧人物源</option>
+        </select></label>
+        <label class="compact-control"><span>双轨时间</span><select id="syncMode" aria-label="双轨时间模式">
+          <option value="original">原始时间</option><option value="subtitle">字幕对齐</option>
+        </select></label>
+      </div>
       <div class="progress-row">
         <span id="currentTime">0:00</span>
         <input id="progress" class="progress" type="range" min="0" max="1000" value="0" aria-label="播放进度">
@@ -107,6 +118,55 @@
     <audio id="audioLeft" preload="metadata"></audio>
     <audio id="audioRight" preload="metadata"></audio>
   </main>
+
+  <dialog id="aiDialog" class="ai-dialog" aria-labelledby="aiHeading">
+    <div class="ai-heading"><div><div class="eyebrow">LISTEN · TRANSCRIBE · TRANSLATE</div><h2 id="aiHeading">AI 字幕工作台 <small>v0.02</small></h2></div><button id="aiClose" class="icon-button" type="button" aria-label="关闭 AI 字幕">×</button></div>
+    <p id="aiTrackInfo" class="ai-track-info">先选择一条音轨</p>
+    <form id="aiForm" autocomplete="off">
+      <fieldset class="ai-task-settings"><legend>处理当前音轨</legend>
+        <label>任务<select id="aiTaskMode"><option value="audio">无字幕音频：识别并翻译</option><option value="subtitles">已有台本：只翻译</option></select></label>
+        <label>原语言<select id="aiSourceLanguage"><option value="ja">日语</option><option value="auto">自动检测</option><option value="en">英语</option><option value="zh">中文</option><option value="ko">韩语</option></select></label>
+        <label>译入语言<input id="aiTargetLanguage" value="简体中文" maxlength="80" required></label>
+      </fieldset>
+      <div class="ai-api-grid">
+        <fieldset id="asrSettings"><legend><b>01</b> 语音识别</legend><p class="field-help">使用支持音频与时间戳的模型；普通聊天模型不能代替识别。</p>
+          <label>完整接口地址<input id="asrEndpoint" type="url" placeholder="https://服务商/v1/audio/transcriptions" spellcheck="false" autocomplete="off"></label>
+          <label>模型 ID<input id="asrModel" placeholder="例如 whisper-1 或服务商的语音模型" spellcheck="false" maxlength="200"></label>
+          <label>API Key<input id="asrKey" type="password" autocomplete="off" spellcheck="false" placeholder="只留在本页面，不保存"></label>
+          <label>时间戳格式<select id="asrFormat"><option value="verbose_json">verbose_json · Whisper 兼容</option><option value="diarized_json">diarized_json · 支持说话人区分</option></select></label>
+        </fieldset>
+        <fieldset><legend><b>02</b> 台本翻译</legend><p class="field-help">兼容 Chat Completions 的文字模型；内置多人 ASMR 翻译提示词。</p>
+          <label>完整接口地址<input id="translationEndpoint" type="url" placeholder="https://服务商/v1/chat/completions" spellcheck="false" autocomplete="off" required></label>
+          <label>模型 ID<input id="translationModel" placeholder="填写服务商给出的文字模型 ID" spellcheck="false" maxlength="200" required></label>
+          <label>API Key<input id="translationKey" type="password" autocomplete="off" spellcheck="false" placeholder="可以与语音识别使用不同服务" required></label>
+          <button id="aiReuseConfig" type="button" class="text-button">沿用识别服务与 Key</button>
+        </fieldset>
+      </div>
+      <details class="ai-details"><summary>翻译风格、术语与接口说明</summary>
+        <p>保留人物身份、低语语气、口语停顿与拟声词，结合前后文翻译，不新增台词。模型只返回译文，原时间轴由播放器保留。说话人标签由识别模型给出，各分片可能重新编号；耳语、重叠发言及跨片段身份需要校对。</p>
+        <label>角色名与术语对照（可选）<textarea id="aiGlossary" rows="3" maxlength="6000" placeholder="例如：先輩 → 前辈；人名保持原写法"></textarea></label>
+        <p>接口须支持上述兼容协议和浏览器跨域（CORS）。只填写模型名称不足以调用服务，还需接口地址与 Key。网页不会代建中转或代付调用费用。</p>
+      </details>
+      <div class="ai-preferences"><label><input id="aiRemember" type="checkbox">记住接口设置（不含 Key）</label><button id="aiForgetKeys" class="text-button" type="button">清空 Key</button></div>
+      <p id="aiDestination" class="ai-disclosure">点击开始后，仅当前音轨的音频分片发往识别接口，台本发往翻译接口；服务商可能计费。未开始时不发送。</p>
+      <div class="ai-actions"><button id="aiStart" class="text-button ai-primary" type="submit">开始识别并翻译</button><button id="aiCancel" class="text-button" type="button" disabled>取消任务</button></div>
+    </form>
+    <section class="ai-result" aria-label="字幕结果">
+      <div id="aiStatus" class="ai-status" role="status" aria-live="polite">准备就绪。成功片段保留在本页面，失败后可续做。</div>
+      <progress id="aiProgress" max="1" value="0" aria-label="AI 任务进度"></progress>
+      <div class="ai-result-controls">
+        <label>显示<select id="aiDisplayMode"><option value="bilingual">原文与译文</option><option value="translated">仅译文</option><option value="original">仅原文</option></select></label>
+        <label>导出<select id="aiExportFormat"><option value="vtt">VTT 字幕</option><option value="srt">SRT 字幕</option><option value="json">JSON 结果（可重新导入）</option></select></label>
+        <button id="aiExport" type="button" class="text-button" disabled>下载结果</button>
+        <button id="aiImport" type="button" class="text-button">导入台本／结果</button>
+        <button id="aiOriginal" type="button" class="text-button">还原曲库字幕</button>
+      </div>
+      <label class="ai-import-source">VTT／SRT 导入导出对应音源<select id="aiImportSource" aria-label="导入导出对应音源"></select></label>
+      <input id="aiImportFile" type="file" accept=".vtt,.srt,.json" hidden>
+      <p class="field-help">结果仅保留在当前页面。JSON 保存全部音源、原文与译文，可完整恢复；VTT／SRT 仅导出上方所选音源，使用原文件时间轴。切换音轨会停止任务。</p>
+      <div id="aiPreview" class="ai-preview" aria-label="字幕预览"></div>
+    </section>
+  </dialog>
 
   <script type="module" src="./js/app.mjs"></script>
 </body>

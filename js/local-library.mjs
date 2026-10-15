@@ -146,6 +146,7 @@ export async function scanLocalFiles(files, {
   const { entries, selectedRoot } = prepareFiles(files);
   const byPath = new Map(entries.map((entry) => [entry.path, entry]));
   const resourceUrls = new Map();
+  const filesByUrl = new Map();
   const counts = { files: entries.length, audio: 0, tracks: 0, works: 0 };
   const works = [];
   const categories = [];
@@ -156,10 +157,15 @@ export async function scanLocalFiles(files, {
     disposed = true;
     for (const url of resourceUrls.values()) revokeObjectURL(url);
     resourceUrls.clear();
+    filesByUrl.clear();
   };
   const urlFor = (entry) => {
     if (!entry) return null;
-    if (!resourceUrls.has(entry.path)) resourceUrls.set(entry.path, createObjectURL(entry.file));
+    if (!resourceUrls.has(entry.path)) {
+      const url = createObjectURL(entry.file);
+      resourceUrls.set(entry.path, url);
+      filesByUrl.set(url, entry.file);
+    }
     return resourceUrls.get(entry.path);
   };
   const report = (phase) => onProgress({ phase, ...counts });
@@ -271,7 +277,7 @@ export async function scanLocalFiles(files, {
       report('scan');
     }
     report('complete');
-    return { works, categories, profiles, counts, dispose };
+    return { works, categories, profiles, counts, dispose, getFile: (url) => filesByUrl.get(url) ?? null };
   } catch (error) {
     dispose();
     throw error;
