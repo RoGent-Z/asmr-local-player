@@ -1,5 +1,6 @@
 import { sanitizeCloudProfiles } from './library-source.mjs';
 import { decodeSubtitleBytes, parseSubtitle } from './subtitles.mjs';
+import { selectWorkCover } from './cover-policy.mjs';
 
 const naturalCollator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' });
 const pinyinCollator = new Intl.Collator('zh-CN-u-co-pinyin', { sensitivity: 'base' });
@@ -282,14 +283,11 @@ export async function scanLocalFiles(files, {
       const pictures = workEntries.filter((entry) => (
         /^p\/[^/]+$/i.test(relativeId(entry)) && imageExtensions.includes(extension(entry.path))
       )).sort((left, right) => naturalCollator.compare(baseName(left.path), baseName(right.path)));
-      const covers = pictures.filter((entry) => stem(entry.path).toLowerCase() === 'top')
-        .sort((left, right) => imageExtensions.indexOf(extension(left.path)) - imageExtensions.indexOf(extension(right.path))
-          || naturalCollator.compare(baseName(left.path), baseName(right.path)));
       const backgroundCandidates = workEntries.filter((entry) => imageExtensions.includes(extension(entry.path)))
         .sort((left, right) => naturalCollator.compare(relativeId(left), relativeId(right)))
         .map((entry) => ({ path: relativeId(entry), label: relativeId(entry), url: urlFor(entry) }));
       works.push({
-        ...work, backgroundUrl: null, thumbnailUrl: urlFor(covers[0]),
+        ...work, backgroundUrl: null, thumbnailUrl: selectWorkCover(backgroundCandidates).image?.url ?? null,
         backgroundCandidates, visualReferenceUrls: pictures.map(urlFor), tracks, folderTree: buildFolderTree(tracks),
       });
       let category = categories.find((entry) => entry.id === work.categoryPath);

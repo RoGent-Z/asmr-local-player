@@ -2,6 +2,7 @@ import { sourceToPresentation } from './alignment.mjs';
 import { buildTrackPlayback } from './playback-mode.mjs';
 import { createAiWorkbench } from './ai-workbench.mjs';
 import { createBackgroundPicker } from './background.mjs';
+import { createCoverPicker } from './cover-picker.mjs';
 import { displaySourceCues } from './transcript.mjs';
 import {
   activeDialogueIds,
@@ -104,6 +105,7 @@ let aiDocument = null;
 let aiDisplayMode = 'bilingual';
 let aiWorkbench = null;
 let backgroundPicker = null;
+let coverPicker = null;
 const libraryMode = document.querySelector('meta[name="library-source"]')?.content ?? 'local-files';
 let activeDialogueItemIds = new Set();
 const dialogueNodes = new Map();
@@ -246,6 +248,11 @@ backgroundPicker = createBackgroundPicker({
   onOpenChange: (open) => { if (open) setActiveDrawer(null); showUi(); },
   onError: showToast,
 });
+coverPicker = createCoverPicker({
+  onChange: () => renderLibrary(),
+  onOpenChange: () => showUi(),
+  onError: showToast,
+});
 
 function formatTime(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
@@ -269,6 +276,7 @@ function showToast(message) {
 }
 
 function setActiveDrawer(nextDrawer) {
+  const previousDrawer = activeDrawer;
   activeDrawer = nextDrawer;
   const libraryOpen = nextDrawer === 'library';
   const dialogueOpen = nextDrawer === 'dialogue';
@@ -277,6 +285,14 @@ function setActiveDrawer(nextDrawer) {
   elements.drawerScrim.classList.toggle('visible', Boolean(nextDrawer));
   elements.menuButton.setAttribute('aria-expanded', String(libraryOpen));
   elements.dialogueButton.setAttribute('aria-expanded', String(dialogueOpen));
+  elements.drawer.inert = !libraryOpen;
+  elements.dialogueDrawer.inert = !dialogueOpen;
+  elements.drawer.setAttribute('aria-hidden', String(!libraryOpen));
+  elements.dialogueDrawer.setAttribute('aria-hidden', String(!dialogueOpen));
+  if (!document.querySelector('dialog[open]')) {
+    if (nextDrawer && nextDrawer !== previousDrawer) (libraryOpen ? elements.closeDrawerButton : elements.closeDialogueButton).focus({ preventScroll:true });
+    else if (!nextDrawer && previousDrawer) (previousDrawer === 'library' ? elements.menuButton : elements.dialogueButton).focus({ preventScroll:true });
+  }
   if (dialogueOpen) updateActiveDialogue(player.currentTime(), true);
   showUi();
 }
@@ -284,7 +300,7 @@ function setActiveDrawer(nextDrawer) {
 function scheduleHide() {
   window.clearTimeout(hideTimer);
   if (!player.paused() && activeDrawer === null && !aiWorkbench?.isOpen()
-    && !backgroundPicker?.isOpen() && !matchMedia('(pointer: coarse)').matches) {
+    && !backgroundPicker?.isOpen() && !coverPicker?.isOpen() && !matchMedia('(pointer: coarse)').matches) {
     hideTimer = window.setTimeout(() => {
       elements.app.classList.add('ui-hidden');
     }, 3000);
@@ -471,6 +487,7 @@ function createTrackButton(work, track, candidateWorkIndex) {
 
   const button = document.createElement('button');
   button.type = 'button';
+  button.dataset.focusKey = `track:${JSON.stringify([work.relativePath || work.id, track.id])}`;
   button.className = `track-button${
     candidateWorkIndex === workIndex && candidateTrackIndex === trackIndex
       ? ' active'
@@ -520,6 +537,7 @@ function renderFolderNode(work, node, candidateWorkIndex, depth) {
   const header = document.createElement('button');
   header.type = 'button';
   header.className = 'folder-header';
+  header.dataset.focusKey = `folder:${key}`;
   header.setAttribute('aria-expanded', String(expanded));
   const chevron = document.createElement('span');
   chevron.className = 'folder-chevron';
@@ -566,6 +584,7 @@ function createWorkCard(work, candidateWorkIndex) {
   const header = document.createElement('button');
   header.type = 'button';
   header.className = 'work-header';
+  header.dataset.focusKey = `work:${work.relativePath || work.id}`;
   header.setAttribute('aria-expanded', String(expanded));
   const heading = document.createElement('div');
   heading.style.minWidth = '0';
@@ -602,20 +621,32 @@ function createWorkCard(work, candidateWorkIndex) {
 
   const thumbnail = document.createElement('div');
   thumbnail.className = 'work-thumbnail';
-  if (work.thumbnailUrl) {
+  const cover = coverPicker.resolve(work);
+  thumbnail.dataset.needsChoice = String(cover.needsChoice);
+  if (cover.image) {
     const image = document.createElement('img');
-    image.src = work.thumbnailUrl;
+    image.src = cover.image.url;
+    image.dataset.path = cover.image.path;
     image.alt = '';
     image.loading = 'lazy';
     image.decoding = 'async';
     image.addEventListener('error', () => {
-      thumbnail.classList.add('missing');
-      image.remove();
+      if (works.includes(work)) coverPicker.markFailed(work, cover.image.path);
     });
     thumbnail.append(image);
   } else {
     thumbnail.classList.add('missing');
+    const prompt = document.createElement('p'); prompt.className = 'cover-prompt';
+    prompt.textContent = cover.needsChoice ? `${cover.choices.length} 张同优先级图片，选择一张封面` : '暂无可用封面';
+    thumbnail.append(prompt);
   }
+  const chooseCover = document.createElement('button');
+  chooseCover.type = 'button'; chooseCover.className = 'cover-button';
+  chooseCover.dataset.focusKey = `cover:${work.relativePath || work.id}`;
+  chooseCover.textContent = cover.image ? '更换封面' : '选择封面';
+  chooseCover.setAttribute('aria-label', `${work.title} · ${chooseCover.textContent}`);
+  chooseCover.addEventListener('click', () => coverPicker.open(work, chooseCover));
+  thumbnail.append(chooseCover);
 
   card.append(header, list, thumbnail);
   return card;
@@ -630,6 +661,7 @@ function renderCategoryNode(category) {
   const header = document.createElement('button');
   header.type = 'button';
   header.className = 'collection-header';
+  header.dataset.focusKey = `collection:${category.id}`;
   header.setAttribute('aria-expanded', String(expanded));
   const chevron = document.createElement('span');
   chevron.className = 'collection-chevron';
@@ -665,6 +697,8 @@ function renderCategoryNode(category) {
 }
 
 function renderLibrary() {
+  const scrollTop = elements.drawer.scrollTop;
+  const focusKey = elements.drawer.contains(document.activeElement) ? document.activeElement?.dataset.focusKey : null;
   elements.library.replaceChildren();
   if (works.length === 0) {
     const empty = document.createElement('div');
@@ -692,6 +726,8 @@ function renderLibrary() {
       elements.library.append(renderCategoryNode(category));
     }
   }
+  if (focusKey && !document.querySelector('dialog[open]')) [...elements.library.querySelectorAll('[data-focus-key]')].find(node => node.dataset.focusKey === focusKey)?.focus({ preventScroll:true });
+  elements.drawer.scrollTop = scrollTop;
 }
 
 function loadMedia(audio, url) {
@@ -803,6 +839,8 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
   persistCurrent();
   player.pause();
   trackReady = false;
+  elements.playButton.disabled = true;
+  elements.progress.disabled = true;
   preparedTrack = null; aiDocument = null;
   aiWorkbench?.trackChanged();
   spectrum.reset();
@@ -831,7 +869,7 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
   elements.workTitle.textContent = work.title;
   elements.trackTitle.textContent = track.title;
   elements.subtitleStatus.textContent = '载入中';
-  document.title = `${track.title} · ASMR v0.0.3`;
+  document.title = `${track.title} · ASMR v0.0.4`;
   const semanticKey = trackProfileKey(work.id, track.id);
   const visualReference = selectVisualReference(
     work.visualReferenceUrls,
@@ -882,6 +920,8 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
       rightEnabled: prepared.paired,
     });
     trackReady = true;
+    elements.playButton.disabled = false;
+    elements.progress.disabled = false;
     configureListening();
     spectrum.setSemanticFrame(
       semanticFrameAt(semanticTimeline, player.currentTime()),
@@ -935,6 +975,7 @@ async function applyLibrary(data, nextLocalLibrary = null) {
   elements.audioLeft.load();
   clearRightMedia();
   backgroundPicker?.workChanged(null);
+  coverPicker?.reset();
   localLibrary?.dispose();
   localLibrary = nextLocalLibrary;
   works = data.works.filter((work) => work.tracks.length > 0);
@@ -1121,8 +1162,20 @@ document.addEventListener('pointerdown', showUi, { passive: true });
 document.addEventListener('keydown', (event) => {
   showUi();
   if (event.key === 'Escape') setActionsOpen(false);
+  if (activeDrawer && !document.querySelector('dialog[open]')) {
+    if (event.key === 'Escape') { event.preventDefault(); setActiveDrawer(null); return; }
+    if (event.key === 'Tab') {
+      const drawer = activeDrawer === 'library' ? elements.drawer : elements.dialogueDrawer;
+      const focusable = [...drawer.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]')].filter(node => node.getClientRects().length);
+      const first = focusable[0], last = focusable.at(-1);
+      if (!drawer.contains(document.activeElement)) { event.preventDefault(); (event.shiftKey ? last : first)?.focus(); }
+      else if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    }
+    return;
+  }
   const tagName = event.target?.tagName;
-  if (['INPUT', 'SELECT', 'BUTTON', 'TEXTAREA'].includes(tagName) || aiWorkbench?.isOpen() || backgroundPicker?.isOpen()) return;
+  if (['INPUT', 'SELECT', 'BUTTON', 'TEXTAREA'].includes(tagName) || aiWorkbench?.isOpen() || backgroundPicker?.isOpen() || coverPicker?.isOpen()) return;
   if (event.code === 'Space') {
     event.preventDefault();
     if (player.paused()) playAudio();

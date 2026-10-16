@@ -88,8 +88,16 @@ export function createPairedPlayer({
   let frame = 0;
   let endedNotified = false;
   const playPending = new WeakMap();
+  let generation = 0;
+
+  function invalidatePending() {
+    generation += 1;
+    playPending.delete(leftAudio);
+    playPending.delete(rightAudio);
+  }
 
   function pauseAudio(audio) {
+    if (audio) playPending.delete(audio);
     if (audio && !audio.paused) audio.pause();
   }
 
@@ -105,9 +113,18 @@ export function createPairedPlayer({
 
   function startAudio(audio) {
     if (!audio || !audio.paused || playPending.get(audio)) return;
+    const attemptGeneration = generation;
     const pending = audio.play()
-      .catch((error) => onError(error))
-      .finally(() => playPending.delete(audio));
+      .catch((error) => {
+        if (attemptGeneration !== generation || playPending.get(audio) !== pending || clock.paused()) return;
+        clock.pause();
+        invalidatePending();
+        cancelFrame(frame);
+        pauseAudio(leftAudio); pauseAudio(rightAudio);
+        onPlayState(false);
+        onError(error);
+      })
+      .finally(() => { if (playPending.get(audio) === pending) playPending.delete(audio); });
     playPending.set(audio, pending);
   }
 
@@ -169,6 +186,7 @@ export function createPairedPlayer({
       volume = 1,
       rightEnabled = false,
     }) {
+      invalidatePending();
       cancelFrame(frame);
       pauseAudio(leftAudio);
       pauseAudio(rightAudio);
@@ -187,7 +205,8 @@ export function createPairedPlayer({
       sync();
     },
     play() {
-      if (!alignment || clock.ended()) return;
+      if (!alignment || clock.duration() <= 0) return;
+      if (clock.ended()) clock.seek(0);
       clock.play();
       endedNotified = false;
       onPlayState(true);
@@ -196,6 +215,7 @@ export function createPairedPlayer({
       frame = requestFrame(tick);
     },
     pause() {
+      invalidatePending();
       clock.pause();
       cancelFrame(frame);
       sync();
@@ -221,6 +241,7 @@ export function createPairedPlayer({
     paused: clock.paused,
     sync,
     destroy() {
+      invalidatePending();
       cancelFrame(frame);
       pauseAudio(leftAudio);
       pauseAudio(rightAudio);

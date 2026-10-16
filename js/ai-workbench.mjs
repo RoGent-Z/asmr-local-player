@@ -226,7 +226,7 @@ export function createAiWorkbench({ getContext, onApply, onRestore, onOpenChange
     const url = URL.createObjectURL(new Blob([text], { type: format === 'json' ? 'application/json' : 'text/plain;charset=utf-8' }));
     const link = document.createElement('a'); link.href = url;
     const sourceNumber = Math.max(0, doc.sources.indexOf(selected)) + 1;
-    link.download = `asmr-v0.0.3-${format === 'json' ? 'all' : `source${sourceNumber}`}-${el.aiDisplayMode.value}.${format}`;
+    link.download = `asmr-v0.0.4-${format === 'json' ? 'all' : `source${sourceNumber}`}-${el.aiDisplayMode.value}.${format}`;
     link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
   el.aiImport.addEventListener('click', () => el.aiImportFile.click());
