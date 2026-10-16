@@ -1,8 +1,10 @@
 import { sanitizeCloudProfiles } from './library-source.mjs';
+import { decodeSubtitleBytes, parseSubtitle } from './subtitles.mjs';
 
 const naturalCollator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' });
 const pinyinCollator = new Intl.Collator('zh-CN-u-co-pinyin', { sensitivity: 'base' });
 const audioExtensions = new Set(['.mp3', '.wav']);
+const subtitleFormats = ['vtt', 'srt', 'ass', 'ssa', 'lrc'];
 const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.avif', '.gif'];
 const profileFileName = 'cloud-semantic-profiles-v2.json';
 const excludedDirectories = new Set([
@@ -144,7 +146,7 @@ export async function scanLocalFiles(files, {
   onProgress = () => {},
 } = {}) {
   const { entries, selectedRoot } = prepareFiles(files);
-  const byPath = new Map(entries.map((entry) => [entry.path, entry]));
+  const byPathLower = new Map(entries.map((entry) => [entry.path.toLowerCase(), entry]));
   const resourceUrls = new Map();
   const filesByUrl = new Map();
   const counts = { files: entries.length, audio: 0, tracks: 0, works: 0 };
@@ -171,7 +173,19 @@ export async function scanLocalFiles(files, {
   const report = (phase) => onProgress({ phase, ...counts });
   report('scan');
 
+  function subtitleFor(entry) {
+    const bases = [entry.path, entry.path.slice(0, -extension(entry.path).length)];
+    for (const base of bases) {
+      for (const format of subtitleFormats) {
+        const found = byPathLower.get(`${base}.${format}`.toLowerCase());
+        if (found) return { entry: found, format };
+      }
+    }
+    return null;
+  }
+
   async function sourceRecord(entry, relativeId, side = 'center', label = null) {
+    const subtitle = subtitleFor(entry);
     let hairPalette = [];
     let colorVersion = null;
     if (label && extension(entry.path) === '.mp3') {
@@ -187,24 +201,33 @@ export async function scanLocalFiles(files, {
     }
     return {
       id: relativeId, side, label, hairPalette, colorVersion,
-      audioUrl: urlFor(entry), subtitleUrl: urlFor(byPath.get(`${entry.path}.vtt`)),
+      audioUrl: urlFor(entry),
+      subtitleUrl: urlFor(subtitle?.entry),
+      subtitleFormat: subtitle?.format ?? null,
     };
   }
 
   async function pairedTrack(group, relativeId) {
     if (group.number === null || group.entries.length !== 2) return null;
-    const subtitles = group.entries.map((entry) => byPath.get(`${entry.path}.vtt`));
+    const subtitles = group.entries.map(subtitleFor);
     if (subtitles.some((entry) => !entry)) return null;
     const labels = new Set();
     try {
       for (const subtitle of subtitles) {
-        for (const match of (await subtitle.file.text()).matchAll(/【([^】]+)】/g)) labels.add(match[1]);
+        if (subtitle.entry.file.size > 20 * 1024 * 1024) return null;
+        const parsed = parseSubtitle(decodeSubtitleBytes(await subtitle.entry.file.arrayBuffer()), { format: subtitle.format });
+        for (const cue of parsed.cues) {
+          if (cue.speaker) labels.add(cue.speaker);
+          for (const match of cue.text.matchAll(/【([^】]+)】/g)) labels.add(match[1]);
+        }
       }
     } catch { return null; }
-    if (labels.size !== 2) return null;
+    if (labels.size !== 2 && labels.size !== 0) return null;
     const matched = group.entries.map((entry) => {
       const matches = [...labels].filter((label) => stem(entry.path).includes(label));
-      return matches.length === 1 ? { entry, label: matches[0] } : null;
+      const label = labels.size ? (matches.length === 1 ? matches[0] : null)
+        : stem(entry.path).replace(/^Track\s*\d+\s*/i, '').trim();
+      return label ? { entry, label } : null;
     });
     if (matched.some((entry) => !entry) || new Set(matched.map((entry) => entry.label)).size !== 2) return null;
     matched.sort((left, right) => pinyinCollator.compare(left.label, right.label));
@@ -262,9 +285,12 @@ export async function scanLocalFiles(files, {
       const covers = pictures.filter((entry) => stem(entry.path).toLowerCase() === 'top')
         .sort((left, right) => imageExtensions.indexOf(extension(left.path)) - imageExtensions.indexOf(extension(right.path))
           || naturalCollator.compare(baseName(left.path), baseName(right.path)));
+      const backgroundCandidates = workEntries.filter((entry) => imageExtensions.includes(extension(entry.path)))
+        .sort((left, right) => naturalCollator.compare(relativeId(left), relativeId(right)))
+        .map((entry) => ({ path: relativeId(entry), label: relativeId(entry), url: urlFor(entry) }));
       works.push({
         ...work, backgroundUrl: null, thumbnailUrl: urlFor(covers[0]),
-        visualReferenceUrls: pictures.map(urlFor), tracks, folderTree: buildFolderTree(tracks),
+        backgroundCandidates, visualReferenceUrls: pictures.map(urlFor), tracks, folderTree: buildFolderTree(tracks),
       });
       let category = categories.find((entry) => entry.id === work.categoryPath);
       if (!category) {

@@ -2,18 +2,19 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <meta name="library-source" content="local-files">
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob: https:; object-src 'none'; base-uri 'none'; form-action 'none'">
-  <meta name="app-version" content="0.02">
-  <title>ASMR 原声播放器 · v0.02</title>
+  <meta name="app-version" content="0.0.3">
+  <title>ASMR 原声播放器 · v0.0.3</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <main id="app" class="app">
+    <img id="workBackground" class="work-background" alt="" aria-hidden="true">
     <div class="veil" aria-hidden="true"></div>
     <canvas id="voiceAtmosphere" class="voice-atmosphere" aria-hidden="true"></canvas>
     <canvas id="leftSpectrum" class="spectrum-canvas spectrum-left" aria-hidden="true"></canvas>
@@ -28,18 +29,25 @@
         <div id="trackTitle" class="track-title">正在扫描本地作品…</div>
       </div>
       <div id="subtitleStatus" class="status-pill">本地模式</div>
-      <button id="openFolderButton" class="text-button" type="button">打开文件夹</button>
-      <button id="aiButton" class="text-button ai-entry" type="button" aria-haspopup="dialog">AI 字幕 <span class="version-tag">v0.02</span></button>
-      <button id="dialogueButton" class="text-button" type="button"
-        aria-label="打开全部台词" aria-expanded="false">台词</button>
+      <button id="actionsButton" class="icon-button mobile-actions-button" type="button" aria-label="打开播放器菜单" aria-expanded="false" aria-controls="topbarActions">•••</button>
+      <div id="topbarActions" class="topbar-actions">
+        <button id="openFolderButton" class="text-button" type="button">打开文件夹</button>
+        <button id="openFilesButton" class="text-button" type="button">选择文件</button>
+        <button id="aiButton" class="text-button ai-entry" type="button" aria-haspopup="dialog">AI 字幕 <span class="version-tag">v0.0.3</span></button>
+        <button id="backgroundButton" class="text-button" type="button" aria-haspopup="dialog" disabled>作品背景</button>
+        <button id="dialogueButton" class="text-button" type="button"
+          aria-label="打开全部台词" aria-expanded="false">台词</button>
+      </div>
     </header>
 
     <input id="folderInput" class="file-input" type="file" webkitdirectory multiple aria-label="选择本机曲库文件夹" tabindex="-1">
+    <input id="filesInput" class="file-input" type="file" multiple accept=".mp3,.wav,.vtt,.srt,.ass,.ssa,.lrc,.jpg,.jpeg,.png,.webp,.avif,.gif" aria-label="选择音频、字幕和图片文件" tabindex="-1">
     <section id="libraryWelcome" class="library-welcome" aria-label="打开本机曲库" hidden>
       <div class="eyebrow">YOUR FILES · YOUR PLAYER</div>
       <h1>把声音，留在自己这里。</h1>
       <p>保留双耳细节，听见每一个人。<br>本机曲库 · 多人原声 · AI 识别与翻译</p>
       <button id="chooseFolderButton" class="text-button choose-folder-button" type="button">选择曲库文件夹</button>
+      <button id="chooseFilesButton" class="text-button choose-files-button" type="button">或选择音频、字幕与图片</button>
       <p id="importStatus" class="import-status" role="status">播放仅在本机读取；AI 处理需自行填写接口并主动开始。<br>刷新后重新选择同一文件夹，即可恢复进度。</p>
     </section>
 
@@ -71,6 +79,7 @@
       <div id="leftSubtitles" class="subtitle-column subtitle-left"></div>
       <div id="rightSubtitles" class="subtitle-column subtitle-right"></div>
       <div id="centerSubtitles" class="subtitle-column subtitle-center"></div>
+      <div id="mobileSubtitles" class="mobile-subtitles"></div>
     </section>
 
     <section id="controls" class="controls" aria-label="播放器控制">
@@ -120,7 +129,7 @@
   </main>
 
   <dialog id="aiDialog" class="ai-dialog" aria-labelledby="aiHeading">
-    <div class="ai-heading"><div><div class="eyebrow">LISTEN · TRANSCRIBE · TRANSLATE</div><h2 id="aiHeading">AI 字幕工作台 <small>v0.02</small></h2></div><button id="aiClose" class="icon-button" type="button" aria-label="关闭 AI 字幕">×</button></div>
+    <div class="ai-heading"><div><div class="eyebrow">LISTEN · TRANSCRIBE · TRANSLATE</div><h2 id="aiHeading">AI 字幕工作台 <small>v0.0.3</small></h2></div><button id="aiClose" class="icon-button" type="button" aria-label="关闭 AI 字幕">×</button></div>
     <p id="aiTrackInfo" class="ai-track-info">先选择一条音轨</p>
     <form id="aiForm" autocomplete="off">
       <fieldset class="ai-task-settings"><legend>处理当前音轨</legend>
@@ -161,11 +170,20 @@
         <button id="aiImport" type="button" class="text-button">导入台本／结果</button>
         <button id="aiOriginal" type="button" class="text-button">还原曲库字幕</button>
       </div>
-      <label class="ai-import-source">VTT／SRT 导入导出对应音源<select id="aiImportSource" aria-label="导入导出对应音源"></select></label>
-      <input id="aiImportFile" type="file" accept=".vtt,.srt,.json" hidden>
+      <label class="ai-import-source">字幕导入导出对应音源<select id="aiImportSource" aria-label="导入导出对应音源"></select></label>
+      <input id="aiImportFile" type="file" accept=".vtt,.srt,.ass,.ssa,.lrc,.json" hidden>
+      <p class="field-help">支持 VTT、SRT、ASS/SSA、LRC。ASS/SSA 读取台词、时间和人物，使用播放器统一样式。</p>
       <p class="field-help">结果仅保留在当前页面。JSON 保存全部音源、原文与译文，可完整恢复；VTT／SRT 仅导出上方所选音源，使用原文件时间轴。切换音轨会停止任务。</p>
       <div id="aiPreview" class="ai-preview" aria-label="字幕预览"></div>
     </section>
+  </dialog>
+
+  <dialog id="backgroundDialog" class="background-dialog" aria-labelledby="backgroundHeading">
+    <div class="ai-heading"><div><div class="eyebrow">YOUR LIBRARY · YOUR SCENE</div><h2 id="backgroundHeading">选择作品背景</h2></div><button id="backgroundClose" class="icon-button" type="button" aria-label="关闭背景选择">×</button></div>
+    <p id="backgroundWorkName" class="ai-track-info"></p>
+    <p class="field-help">从这部作品的图片中选择。图片留在本机；重新选择同一曲库后会恢复你的选择。</p>
+    <div id="backgroundGallery" class="background-gallery"></div>
+    <button id="backgroundNone" class="text-button" type="button">使用默认暗色背景</button>
   </dialog>
 
   <script type="module" src="./js/app.mjs"></script>

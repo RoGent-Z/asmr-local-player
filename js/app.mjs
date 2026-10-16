@@ -1,6 +1,7 @@
 import { sourceToPresentation } from './alignment.mjs';
 import { buildTrackPlayback } from './playback-mode.mjs';
 import { createAiWorkbench } from './ai-workbench.mjs';
+import { createBackgroundPicker } from './background.mjs';
 import { displaySourceCues } from './transcript.mjs';
 import {
   activeDialogueIds,
@@ -28,10 +29,12 @@ import {
   trackProfileKey,
 } from './semantic-visuals.mjs';
 import { createSpectrumRenderer } from './spectrum.mjs';
-import { parseVtt } from './subtitles.mjs';
+import { assignSourceIdentity, decodeSubtitleBytes, parseSubtitle } from './subtitles.mjs';
 
 const elements = {
   app: document.querySelector('#app'),
+  actionsButton: document.querySelector('#actionsButton'),
+  topbarActions: document.querySelector('#topbarActions'),
   audioLeft: document.querySelector('#audioLeft'),
   audioRight: document.querySelector('#audioRight'),
   centerSpectrum: document.querySelector('#centerSpectrum'),
@@ -39,6 +42,7 @@ const elements = {
   closeDialogueButton: document.querySelector('#closeDialogueButton'),
   closeDrawerButton: document.querySelector('#closeDrawerButton'),
   chooseFolderButton: document.querySelector('#chooseFolderButton'),
+  chooseFilesButton: document.querySelector('#chooseFilesButton'),
   currentTime: document.querySelector('#currentTime'),
   dialogueButton: document.querySelector('#dialogueButton'),
   dialogueDrawer: document.querySelector('#dialogueDrawer'),
@@ -48,6 +52,7 @@ const elements = {
   duration: document.querySelector('#duration'),
   fullscreenButton: document.querySelector('#fullscreenButton'),
   folderInput: document.querySelector('#folderInput'),
+  filesInput: document.querySelector('#filesInput'),
   importStatus: document.querySelector('#importStatus'),
   leftSpectrum: document.querySelector('#leftSpectrum'),
   leftSubtitles: document.querySelector('#leftSubtitles'),
@@ -56,8 +61,10 @@ const elements = {
   listeningMode: document.querySelector('#listeningMode'),
   syncMode: document.querySelector('#syncMode'),
   menuButton: document.querySelector('#menuButton'),
+  mobileSubtitles: document.querySelector('#mobileSubtitles'),
   nextButton: document.querySelector('#nextButton'),
   openFolderButton: document.querySelector('#openFolderButton'),
+  openFilesButton: document.querySelector('#openFilesButton'),
   playButton: document.querySelector('#playButton'),
   previousButton: document.querySelector('#previousButton'),
   progress: document.querySelector('#progress'),
@@ -96,6 +103,7 @@ let preparedTrack = null;
 let aiDocument = null;
 let aiDisplayMode = 'bilingual';
 let aiWorkbench = null;
+let backgroundPicker = null;
 const libraryMode = document.querySelector('meta[name="library-source"]')?.content ?? 'local-files';
 let activeDialogueItemIds = new Set();
 const dialogueNodes = new Map();
@@ -177,8 +185,10 @@ function getAiContext() {
   const work = currentWork();
   const sources = track.sources.map((source) => ({
     ...source, name: source.id, blob: localLibrary?.getFile(source.audioUrl) ?? null,
+    duration: source.side === 'right' ? preparedTrack.rightDuration : preparedTrack.leftDuration,
     cues: (preparedTrack.sourceCues[source.id] ?? []).map((cue, index) => ({
       id: `${source.id}:${index}`, start: cue.start, end: cue.end, text: cue.text,
+      ...(cue.speaker ? { speaker: cue.speaker } : {}),
     })),
   }));
   const trackKey = JSON.stringify([work.id, track.id, ...sources.map((source) => [source.id, source.blob?.size ?? 0, source.blob?.lastModified ?? 0])]);
@@ -205,8 +215,9 @@ function refreshTrackCues() {
   } else {
     cues = preparedTrack.cues;
     elements.subtitleStatus.textContent = cues.length
-      ? preparedTrack.paired ? elements.syncMode.value === 'subtitle' ? '双 VTT 已合并' : '原声 · 双轨字幕' : '字幕已同步'
-      : '无字幕';
+      ? preparedTrack.paired ? elements.syncMode.value === 'subtitle' ? '双轨字幕已对齐' : '原声 · 双轨字幕' : '字幕已同步'
+      : preparedTrack.subtitleErrors?.length ? '字幕读取失败' : '无字幕';
+    elements.subtitleStatus.title = preparedTrack.subtitleErrors?.join('\n') ?? '';
   }
   dialogueItems = buildDialogueItems(cues);
   renderDialogueList(); clearSubtitles();
@@ -230,6 +241,10 @@ aiWorkbench = createAiWorkbench({
   onApply: (doc, mode) => { aiDocument = doc; aiDisplayMode = mode; refreshTrackCues(); },
   onRestore: () => { aiDocument = null; refreshTrackCues(); },
   onOpenChange: (open) => { if (open) { setActiveDrawer(null); window.clearTimeout(hideTimer); } showUi(); },
+});
+backgroundPicker = createBackgroundPicker({
+  onOpenChange: (open) => { if (open) setActiveDrawer(null); showUi(); },
+  onError: showToast,
 });
 
 function formatTime(seconds) {
@@ -268,7 +283,8 @@ function setActiveDrawer(nextDrawer) {
 
 function scheduleHide() {
   window.clearTimeout(hideTimer);
-  if (!player.paused() && activeDrawer === null && !aiWorkbench?.isOpen()) {
+  if (!player.paused() && activeDrawer === null && !aiWorkbench?.isOpen()
+    && !backgroundPicker?.isOpen() && !matchMedia('(pointer: coarse)').matches) {
     hideTimer = window.setTimeout(() => {
       elements.app.classList.add('ui-hidden');
     }, 3000);
@@ -295,6 +311,7 @@ function clearSubtitles() {
   renderSubtitleColumn(elements.leftSubtitles, []);
   renderSubtitleColumn(elements.rightSubtitles, []);
   renderSubtitleColumn(elements.centerSubtitles, []);
+  elements.mobileSubtitles.replaceChildren();
 }
 
 async function saveSemanticProfile(profile) {
@@ -323,6 +340,17 @@ function renderActiveSubtitles(time) {
   renderSubtitleColumn(elements.leftSubtitles, groups.left);
   renderSubtitleColumn(elements.rightSubtitles, groups.right);
   renderSubtitleColumn(elements.centerSubtitles, groups.center);
+  elements.mobileSubtitles.replaceChildren();
+  for (const cue of active) {
+    for (const segment of cue.segments) {
+      const node = document.createElement('div'); node.className = 'subtitle-line mobile-subtitle';
+      node.dataset.side = segment.side;
+      const side = document.createElement('span'); side.className = 'mobile-subtitle-side';
+      side.textContent = segment.side === 'left' ? '左' : segment.side === 'right' ? '右' : '声';
+      node.append(side, document.createTextNode(segment.text));
+      elements.mobileSubtitles.append(node);
+    }
+  }
 }
 
 function renderDialogueList() {
@@ -460,7 +488,7 @@ function createTrackButton(work, track, candidateWorkIndex) {
   badge.className = 'track-badge';
   badge.textContent = track.mode === 'paired'
     ? '双音轨'
-    : track.sources[0].subtitleUrl ? 'VTT' : '无字幕';
+    : track.sources[0].subtitleUrl ? (track.sources[0].subtitleFormat || 'vtt').toUpperCase() : '无字幕';
   button.append(number, title, badge);
   button.addEventListener('click', () => {
     selectTrack(candidateWorkIndex, candidateTrackIndex, true);
@@ -693,11 +721,15 @@ function clearRightMedia() {
   elements.audioRight.load();
 }
 
-async function fetchVtt(url, speakerSides) {
+async function fetchSubtitles(source, speakerSides, durationPromise) {
+  const url = source.subtitleUrl;
   if (!url) return { cues: [], speakerSides: {} };
   const response = await fetch(url, { cache: 'no-store' });
-  if (!response.ok) throw new Error('subtitle fetch failed');
-  return parseVtt(await response.text(), { speakerSides });
+  if (!response.ok) throw new Error('字幕文件无法读取');
+  const bytes = await response.arrayBuffer();
+  if (bytes.byteLength > 20 * 1024 * 1024) throw new Error('字幕文件请控制在 20 MB 以内');
+  const parsed = parseSubtitle(decodeSubtitleBytes(bytes), { format: source.subtitleFormat || 'vtt', speakerSides, duration: await durationPromise });
+  return { ...parsed, cues: assignSourceIdentity(parsed.cues, source) };
 }
 
 async function prepareTrack(track, requestId) {
@@ -715,10 +747,10 @@ async function prepareTrack(track, requestId) {
 
   const subtitlePromises = paired
     ? [
-      fetchVtt(leftSource.subtitleUrl, track.labelSides),
-      fetchVtt(rightSource.subtitleUrl, track.labelSides),
+      fetchSubtitles(leftSource, track.labelSides, leftDurationPromise),
+      fetchSubtitles(rightSource, track.labelSides, rightDurationPromise),
     ]
-    : [fetchVtt(leftSource.subtitleUrl)];
+    : [fetchSubtitles(leftSource, undefined, leftDurationPromise)];
   const [durations, subtitleResults] = await Promise.all([
     Promise.all([leftDurationPromise, rightDurationPromise]),
     Promise.allSettled(subtitlePromises),
@@ -726,6 +758,8 @@ async function prepareTrack(track, requestId) {
   if (requestId !== loadRequest) return null;
 
   const [leftDuration, rightDuration] = durations;
+  const subtitleErrors = subtitleResults.filter((result) => result.status === 'rejected')
+    .map((result) => result.reason?.message || '字幕读取失败');
   if (paired) {
     const leftParsed = subtitleResults[0].status === 'fulfilled'
       ? subtitleResults[0].value
@@ -739,6 +773,7 @@ async function prepareTrack(track, requestId) {
       leftDuration, rightDuration,
       sourceCues: { [leftSource.id]: leftParsed.cues, [rightSource.id]: rightParsed.cues },
       paired,
+      subtitleErrors,
       subtitlesAvailable: leftParsed.cues.length + rightParsed.cues.length > 0,
     };
   }
@@ -752,6 +787,7 @@ async function prepareTrack(track, requestId) {
     leftDuration, rightDuration: 0,
     sourceCues: { [leftSource.id]: parsed.cues },
     paired: false,
+    subtitleErrors,
     cues: parsed.cues,
     subtitlesAvailable: parsed.cues.length > 0,
   };
@@ -780,6 +816,8 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
   const track = currentTrack();
   if (!work || !track) return;
 
+  backgroundPicker.workChanged(work);
+
   cues = [];
   semanticTimeline = [];
   spectrum.setSemanticFrame(null);
@@ -793,7 +831,7 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
   elements.workTitle.textContent = work.title;
   elements.trackTitle.textContent = track.title;
   elements.subtitleStatus.textContent = '载入中';
-  document.title = `${track.title} · ASMR v0.02`;
+  document.title = `${track.title} · ASMR v0.0.3`;
   const semanticKey = trackProfileKey(work.id, track.id);
   const visualReference = selectVisualReference(
     work.visualReferenceUrls,
@@ -813,6 +851,7 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
     const prepared = await prepareTrack(track, requestId);
     if (!prepared || requestId !== loadRequest) return;
     preparedTrack = prepared;
+    if (prepared.subtitleErrors.length) showToast(prepared.subtitleErrors.join('；'));
     cues = prepared.cues;
     const semanticKey = trackProfileKey(work.id, track.id);
     const cachedProfile = semanticProfiles[semanticKey];
@@ -895,6 +934,7 @@ async function applyLibrary(data, nextLocalLibrary = null) {
   elements.audioLeft.removeAttribute('src');
   elements.audioLeft.load();
   clearRightMedia();
+  backgroundPicker?.workChanged(null);
   localLibrary?.dispose();
   localLibrary = nextLocalLibrary;
   works = data.works.filter((work) => work.tracks.length > 0);
@@ -923,11 +963,20 @@ async function applyLibrary(data, nextLocalLibrary = null) {
   await selectTrack(workIndex, trackIndex, false);
 }
 
-async function importFolder(files) {
+async function importFolder(files, flat = false) {
   if (files.length === 0) return;
+  if (flat) {
+    const names = new Set();
+    if (files.some((file) => { const name = file.name.toLowerCase(); if (names.has(name)) return true; names.add(name); return false; })) {
+      showToast('所选文件中有重名文件，无法确定对应关系。请分批选择或使用文件夹方式。');
+      return;
+    }
+  }
   const requestId = ++importRequest;
   elements.openFolderButton.disabled = true;
   elements.chooseFolderButton.disabled = true;
+  elements.openFilesButton.disabled = true;
+  elements.chooseFilesButton.disabled = true;
   elements.openFolderButton.textContent = '读取中…';
   elements.importStatus.textContent = '正在读取曲库目录…';
   try {
@@ -956,6 +1005,8 @@ async function importFolder(files) {
     if (requestId === importRequest) {
       elements.openFolderButton.disabled = false;
       elements.chooseFolderButton.disabled = false;
+      elements.openFilesButton.disabled = false;
+      elements.chooseFilesButton.disabled = false;
       elements.openFolderButton.textContent = '打开文件夹';
     }
   }
@@ -975,10 +1026,26 @@ async function initialize() {
 
 elements.openFolderButton.addEventListener('click', () => elements.folderInput.click());
 elements.chooseFolderButton.addEventListener('click', () => elements.folderInput.click());
+elements.openFilesButton.addEventListener('click', () => elements.filesInput.click());
+elements.chooseFilesButton.addEventListener('click', () => elements.filesInput.click());
+elements.filesInput.addEventListener('change', () => {
+  const files = [...elements.filesInput.files]; elements.filesInput.value = '';
+  importFolder(files, true);
+});
 elements.folderInput.addEventListener('change', () => {
   const files = [...elements.folderInput.files];
   elements.folderInput.value = '';
   importFolder(files);
+});
+
+function setActionsOpen(open) {
+  elements.topbarActions.classList.toggle('open', open);
+  elements.actionsButton.setAttribute('aria-expanded', String(open));
+}
+elements.actionsButton.addEventListener('click', () => setActionsOpen(elements.actionsButton.getAttribute('aria-expanded') !== 'true'));
+elements.topbarActions.addEventListener('click', (event) => { if (event.target.closest('button')) setActionsOpen(false); });
+document.addEventListener('pointerdown', (event) => {
+  if (!elements.topbarActions.contains(event.target) && !elements.actionsButton.contains(event.target)) setActionsOpen(false);
 });
 
 elements.menuButton.addEventListener('click', () => {
@@ -1041,17 +1108,21 @@ elements.syncMode.addEventListener('change', () => {
   refreshTrackCues();
   if (playing) playAudio();
 });
+elements.fullscreenButton.hidden = !document.documentElement.requestFullscreen;
 elements.fullscreenButton.addEventListener('click', async () => {
-  if (document.fullscreenElement) await document.exitFullscreen();
-  else await document.documentElement.requestFullscreen();
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else await document.documentElement.requestFullscreen();
+  } catch { showToast('此浏览器暂不支持页面全屏'); }
 });
 
 document.addEventListener('pointermove', showUi, { passive: true });
 document.addEventListener('pointerdown', showUi, { passive: true });
 document.addEventListener('keydown', (event) => {
   showUi();
+  if (event.key === 'Escape') setActionsOpen(false);
   const tagName = event.target?.tagName;
-  if (['INPUT', 'SELECT', 'BUTTON', 'TEXTAREA'].includes(tagName) || aiWorkbench?.isOpen()) return;
+  if (['INPUT', 'SELECT', 'BUTTON', 'TEXTAREA'].includes(tagName) || aiWorkbench?.isOpen() || backgroundPicker?.isOpen()) return;
   if (event.code === 'Space') {
     event.preventDefault();
     if (player.paused()) playAudio();

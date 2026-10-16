@@ -1,4 +1,5 @@
 import { runSpeechJob } from './speech-job.mjs';
+import { decodeSubtitleBytes } from './subtitles.mjs';
 import { displaySourceCues, exportTimedText, makeTranscriptDocument, parseTimedText, readTranscriptDocument } from './transcript.mjs';
 
 const SETTINGS_KEY = 'asmr-player:ai-settings:v1';
@@ -225,7 +226,7 @@ export function createAiWorkbench({ getContext, onApply, onRestore, onOpenChange
     const url = URL.createObjectURL(new Blob([text], { type: format === 'json' ? 'application/json' : 'text/plain;charset=utf-8' }));
     const link = document.createElement('a'); link.href = url;
     const sourceNumber = Math.max(0, doc.sources.indexOf(selected)) + 1;
-    link.download = `asmr-v0.02-${format === 'json' ? 'all' : `source${sourceNumber}`}-${el.aiDisplayMode.value}.${format}`;
+    link.download = `asmr-v0.0.3-${format === 'json' ? 'all' : `source${sourceNumber}`}-${el.aiDisplayMode.value}.${format}`;
     link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
   el.aiImport.addEventListener('click', () => el.aiImportFile.click());
@@ -236,7 +237,7 @@ export function createAiWorkbench({ getContext, onApply, onRestore, onOpenChange
     const key = context.trackKey;
     try {
       if (file.size > 20 * 1024 * 1024) throw new Error('字幕文件请控制在 20 MB 以内');
-      const text = await file.text();
+      const text = decodeSubtitleBytes(await file.arrayBuffer());
       if (getContext()?.trackKey !== key) return;
       const state = stateFor(key);
       let doc;
@@ -245,7 +246,9 @@ export function createAiWorkbench({ getContext, onApply, onRestore, onOpenChange
         if (doc.sources.some((source) => !context.sources.some((current) => current.id === source.id))) throw new Error('结果中的音源与当前音轨不匹配');
       } else {
         const sourceId = el.aiImportSource.value;
-        const imported = parseTimedText(text, { sourceId });
+        const format = file.name.split('.').at(-1).toLowerCase();
+        const imported = parseTimedText(text, { sourceId, format,
+          duration: context.sources.find((source) => source.id === sourceId)?.duration ?? 0 });
         const previous = state.document?.sources ?? context.sources;
         doc = makeTranscriptDocument({ trackKey: key, sources: context.sources.map((source) => ({
           ...source, cues: source.id === sourceId ? imported : previous.find((item) => item.id === source.id)?.cues ?? [],

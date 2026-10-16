@@ -1,3 +1,5 @@
+import { parseSubtitle } from './subtitles.mjs';
+
 const MAX_CUES = 100000;
 const MAX_TEXT = 24000;
 
@@ -21,8 +23,15 @@ function timestamp(value) {
   return Number(match[1] || 0) * 3600 + Number(match[2]) * 60 + Number(match[3]) + Number(match[4]) / 1000;
 }
 
-export function parseTimedText(text, { sourceId = 'import' } = {}) {
+export function parseTimedText(text, { sourceId = 'import', format, duration = 0 } = {}) {
   if (typeof text !== 'string' || text.length > 20 * 1024 * 1024) throw new Error('字幕文件过大或格式无效');
+  if (['ass', 'ssa', 'lrc'].includes(format)) {
+    return parseSubtitle(text, { format, duration }).cues.map((cue, index) => checkedCue({
+      id: `${sourceId}:${index}`, start: cue.start, end: cue.end,
+      text: cue.speaker && cue.text.startsWith(`【${cue.speaker}】`) ? cue.text.slice(cue.speaker.length + 2) : cue.text,
+      ...(cue.speaker ? { speaker: cue.speaker } : {}),
+    }, index));
+  }
   const blocks = text.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').trim().split(/\n\s*\n/);
   const cues = [];
   for (const block of blocks) {
@@ -39,7 +48,7 @@ export function parseTimedText(text, { sourceId = 'import' } = {}) {
     cues.push(cue);
     if (cues.length > MAX_CUES) throw new Error('字幕条目过多');
   }
-  if (!cues.length) throw new Error('没有找到带时间轴的字幕，请导入 VTT 或 SRT');
+  if (!cues.length) throw new Error('没有找到带时间轴的字幕，请检查文件格式');
   return cues.sort((a, b) => a.start - b.start || a.end - b.end);
 }
 

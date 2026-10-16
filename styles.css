@@ -28,6 +28,7 @@ button {
 }
 
 .app {
+  overflow: hidden;
   --dialogue-left-color: #ff78a8;
   --dialogue-right-color: #78d7ff;
   position: relative;
@@ -37,6 +38,24 @@ button {
   background:
     radial-gradient(circle at 50% 32%, #2c2530 0, #17131b 35%, #0b0a0e 72%, #060608 100%);
 }
+
+.work-background { position: absolute; z-index: -3; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; pointer-events: none; }
+.has-background .work-background { opacity: 1; }
+.has-background .veil { background: linear-gradient(180deg, rgba(5, 4, 8, .62), rgba(5, 4, 8, .44) 40%, rgba(5, 4, 8, .76)); }
+.topbar-actions { display: flex; align-items: center; gap: 9px; }
+.mobile-actions-button, .mobile-subtitles { display: none; }
+.choose-files-button { display: block; margin: 8px auto; height: auto; min-height: 44px; }
+[hidden] { display: none !important; }
+.background-dialog { width: min(820px, calc(100vw - 28px)); max-height: calc(100dvh - 32px); padding: 26px; overflow: auto; color: #eee6ed; background: #151219; border: 1px solid #5d4559; border-radius: 20px; }
+.background-dialog::backdrop { background: #07060bcc; backdrop-filter: blur(8px); }
+.background-dialog h2 { margin: 12px 0; font-size: 25px; font-weight: 500; }
+.background-dialog .field-help { color: #b9aaba; font-size: 13px; line-height: 1.7; }
+.background-gallery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 22px 0; }
+.background-choice { min-width: 0; padding: 6px; border: 1px solid #54424f; border-radius: 12px; background: #211b24; text-align: left; cursor: pointer; }
+.background-choice img { display: block; width: 100%; height: 160px; object-fit: contain; background: #0a090c; border-radius: 7px; }
+.background-choice span { display: block; padding: 10px 5px; overflow-wrap: anywhere; font-size: 12px; line-height: 1.5; }
+.background-choice[aria-pressed="true"] { border-color: #f3b5d3; box-shadow: 0 0 0 2px #c694b1; }
+.background-choice:focus-visible, button:focus-visible { outline: 2px solid #f3b5d3; outline-offset: 3px; }
 
 .veil {
   position: absolute;
@@ -850,6 +869,10 @@ input[type="range"] {
 }
 
 @media (max-width: 900px) {
+  .mobile-actions-button { display: grid; }
+  .topbar-actions { display: none; position: absolute; top: calc(100% - 4px); right: 14px; width: min(270px, calc(100vw - 28px)); padding: 12px; border: 1px solid #5d4559; border-radius: 16px; background: #18131df5; box-shadow: 0 14px 40px #0008; }
+  .topbar-actions.open { display: grid; grid-template-columns: 1fr; }
+  .topbar-actions .text-button { min-height: 44px; text-align: left; }
   .drawer,
   .dialogue-drawer {
     width: min(430px, 75vw);
@@ -949,17 +972,54 @@ button:disabled:hover { transform: none; }
 }
 
 @media (max-width: 600px) {
-  .topbar { padding: 14px 12px; gap: 8px; flex-wrap: wrap; }
-  .topbar .icon-button { width: 38px; height: 38px; }
+  html, body { min-height: 100%; height: auto; overflow: auto; }
+  .app { height: 100vh; height: 100dvh; min-height: 520px; display: flex; flex-direction: column; }
+  .topbar { position: relative; flex: 0 0 auto; min-height: 72px; padding: calc(10px + env(safe-area-inset-top)) 12px 10px; gap: 10px; flex-wrap: nowrap; }
+  .topbar .icon-button { width: 44px; height: 44px; }
   .topbar .now-playing { min-width: 0; flex: 1; }
   .topbar .text-button { padding: 8px 10px; font-size: 12px; }
   .topbar .status-pill { display: none; }
   .library-welcome { top: 43%; padding: 26px 12px; }
   .library-welcome p { font-size: 13px; }
   .library-welcome .import-status { font-size: 11px; }
-  .controls { left: 10px; right: 10px; bottom: 12px; }
+  .controls { position: relative; flex: 0 0 auto; left: auto; right: auto; bottom: auto; margin: 8px 10px calc(10px + env(safe-area-inset-bottom)); padding: 12px 14px; }
   .control-row { gap: 10px; flex-wrap: wrap; justify-content: center; }
   .control-cluster { gap: 10px; }
   .secondary-controls { justify-content: center; }
   .drawer, .dialogue-drawer { width: min(430px, 92vw); }
+  .control-button, .play-button { width: 44px; height: 44px; }
+  .play-button { width: 52px; height: 52px; }
+  .listening-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 2px; }
+  .listening-controls .compact-control { display: grid; gap: 4px; }
+  .listening-controls select { width: 100%; max-width: none; min-height: 38px; }
+  .progress-row { grid-template-columns: 35px minmax(0, 1fr) 35px; gap: 8px; }
+  input[type="range"] { min-height: 36px; }
+  .compact-control select { min-height: 44px; }
+  .subtitle-stage { position: relative; flex: 1 1 auto; min-height: 0; inset: auto; }
+  .subtitle-column { display: none; }
+  .mobile-subtitles { display: flex; position: absolute; inset: 0 14px; flex-direction: column; justify-content: safe flex-end; gap: 9px; overflow-y: auto; pointer-events: auto; padding: 12px 0; scrollbar-width: thin; }
+  .mobile-subtitle { flex: 0 0 auto; max-width: 94%; padding: 10px 12px; font-size: 17px; line-height: 1.55; overflow-wrap: anywhere; background: #0b0811bf; }
+  .mobile-subtitle[data-side="left"] { align-self: flex-start; border-left: 3px solid var(--dialogue-left-color); }
+  .mobile-subtitle[data-side="right"] { align-self: flex-end; border-right: 3px solid var(--dialogue-right-color); }
+  .mobile-subtitle[data-side="center"] { align-self: center; }
+  .mobile-subtitle-side { display: inline-block; padding: 1px 5px; margin-right: 7px; border: 1px solid #ffffff40; border-radius: 4px; font-size: 10px; vertical-align: 2px; opacity: .8; }
+  .background-dialog { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); padding: 18px 14px; }
+  .background-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .background-choice img { height: 130px; }
+  .background-dialog .text-button, .ai-dialog .text-button { min-height: 44px; height: auto; }
+  .ai-dialog input:not([type=checkbox]), .ai-dialog select, .ai-dialog textarea { font-size: 16px; }
+  .toast { top: calc(76px + env(safe-area-inset-top)); max-width: calc(100vw - 32px); border-radius: 12px; font-size: 12px; }
+  .ui-hidden .controls, .ui-hidden .topbar { opacity: 1; transform: none; pointer-events: auto; }
+}
+
+@media (max-width: 900px) and (max-height: 500px) {
+  html, body { overflow-y: auto; }
+  .app { min-height: 500px; }
+  .topbar { min-height: 64px; padding-top: 8px; padding-bottom: 8px; }
+  .controls { padding: 8px 14px; }
+  .listening-controls { margin-bottom: 0; }
+  .subtitle-left, .subtitle-right { top: 35%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0s !important; }
 }
