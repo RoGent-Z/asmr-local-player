@@ -43,15 +43,17 @@ export function createBackgroundPicker({ onOpenChange = () => {}, onError = () =
       const thumb = document.createElement('img');
       thumb.src = candidate.url; thumb.alt = ''; thumb.loading = 'lazy'; thumb.decoding = 'async';
       thumb.addEventListener('error', () => { item.disabled = true; item.classList.add('unavailable'); });
-      const label = document.createElement('span'); label.textContent = candidate.label;
-      item.append(thumb, label); item.addEventListener('click', () => select(candidate.path));
+      item.title = candidate.path;
+      const label = document.createElement('span'); label.className = 'image-choice-label'; label.textContent = candidate.path;
+      const check = document.createElement('span'); check.className = 'image-choice-check'; check.textContent = '✓'; check.setAttribute('aria-hidden', 'true');
+      item.append(thumb, label, check); item.addEventListener('click', () => select(candidate.path));
       gallery.append(item);
     }
     if (!candidates.length) {
       const empty = document.createElement('p'); empty.className = 'field-help';
       empty.textContent = '这部作品中没有可用图片。将图片放入作品文件夹，再重新选择曲库即可。'; gallery.append(empty);
     }
-    if (!dialog.open) { dialog.showModal(); onOpenChange(true); }
+    if (!dialog.open) { dialog.showModal(); gallery.scrollTop = 0; onOpenChange(true); }
   }
   function workChanged(work) {
     const previousKey = currentWork ? keyFor(currentWork) : null;

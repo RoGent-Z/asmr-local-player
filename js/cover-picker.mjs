@@ -55,7 +55,9 @@ export function createCoverPicker({ onChange = () => {}, onOpenChange = () => {}
       button.disabled = failed.get(keyFor(work))?.has(candidate.path) ?? false;
       const image = document.createElement('img');
       image.src = candidate.url; image.alt = ''; image.loading = 'lazy'; image.decoding = 'async';
-      const label = document.createElement('span'); label.textContent = candidate.path;
+      button.title = candidate.path;
+      const label = document.createElement('span'); label.className = 'image-choice-label'; label.textContent = candidate.path;
+      const check = document.createElement('span'); check.className = 'image-choice-check'; check.textContent = '✓'; check.setAttribute('aria-hidden', 'true');
       if (preferred.has(candidate.path)) {
         const badge = document.createElement('small'); badge.className = 'cover-priority'; badge.textContent = '优先候选'; button.append(badge);
       }
@@ -63,14 +65,14 @@ export function createCoverPicker({ onChange = () => {}, onOpenChange = () => {}
         if (requestGeneration !== generation) return;
         button.disabled = true; label.textContent = `${candidate.path} · 无法读取`; markFailed(work, candidate.path);
       });
-      button.append(image, label); button.addEventListener('click', () => save(candidate.path));
+      button.append(image, label, check); button.addEventListener('click', () => save(candidate.path));
       gallery.append(button);
     }
     if (!candidates.length) {
       const empty = document.createElement('p'); empty.className = 'field-help';
       empty.textContent = '当前作品中没有图片。加入图片后重新选择曲库即可。'; gallery.append(empty);
     }
-    dialog.showModal(); onOpenChange(true);
+    dialog.showModal(); gallery.scrollTop = 0; onOpenChange(true);
   }
   document.querySelector('#coverClose').addEventListener('click', () => dialog.close());
   document.querySelector('#coverLater').addEventListener('click', () => dialog.close());

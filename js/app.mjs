@@ -501,6 +501,10 @@ function createTrackButton(work, track, candidateWorkIndex) {
   const title = document.createElement('span');
   title.className = 'track-name';
   title.textContent = track.title;
+  button.title = track.title;
+  if (candidateWorkIndex === workIndex && candidateTrackIndex === trackIndex) {
+    button.setAttribute('aria-current', 'true');
+  }
   const badge = document.createElement('span');
   badge.className = 'track-badge';
   badge.textContent = track.mode === 'paired'
@@ -591,6 +595,7 @@ function createWorkCard(work, candidateWorkIndex) {
   const name = document.createElement('div');
   name.className = 'work-name';
   name.textContent = work.title;
+  name.title = work.title;
   const meta = document.createElement('div');
   meta.className = 'work-meta';
   meta.textContent = `${work.tracks.length} 条音轨`;
@@ -637,18 +642,26 @@ function createWorkCard(work, candidateWorkIndex) {
   } else {
     thumbnail.classList.add('missing');
     const prompt = document.createElement('p'); prompt.className = 'cover-prompt';
-    prompt.textContent = cover.needsChoice ? `${cover.choices.length} 张同优先级图片，选择一张封面` : '暂无可用封面';
+    prompt.textContent = cover.needsChoice ? `待选择封面 · ${cover.choices.length} 张候选` : '暂无可用封面';
     thumbnail.append(prompt);
   }
   const chooseCover = document.createElement('button');
   chooseCover.type = 'button'; chooseCover.className = 'cover-button';
   chooseCover.dataset.focusKey = `cover:${work.relativePath || work.id}`;
-  chooseCover.textContent = cover.image ? '更换封面' : '选择封面';
-  chooseCover.setAttribute('aria-label', `${work.title} · ${chooseCover.textContent}`);
+  const coverAction = cover.image ? '更换封面' : '选择封面';
+  chooseCover.title = coverAction;
+  chooseCover.setAttribute('aria-label', `${work.title} · ${coverAction}`);
+  chooseCover.setAttribute('aria-haspopup', 'dialog');
+  const surface = document.createElement('span');
+  surface.className = 'cover-button-surface';
+  surface.setAttribute('aria-hidden', 'true');
+  // Static local icon; filenames and other library text never enter HTML markup.
+  surface.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M10 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v5"/><circle cx="8" cy="9" r="1.5"/><path d="m3 17 5-5 4 4 3-3M14 21l.7-3.3 5.6-5.6a1.4 1.4 0 0 1 2 2l-5.6 5.6L14 21ZM19 14l2 2"/></svg>';
+  chooseCover.append(surface);
   chooseCover.addEventListener('click', () => coverPicker.open(work, chooseCover));
   thumbnail.append(chooseCover);
 
-  card.append(header, list, thumbnail);
+  card.append(header, thumbnail, list);
   return card;
 }
 
@@ -869,7 +882,7 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
   elements.workTitle.textContent = work.title;
   elements.trackTitle.textContent = track.title;
   elements.subtitleStatus.textContent = '载入中';
-  document.title = `${track.title} · ASMR v0.0.4`;
+  document.title = `${track.title} · ASMR v0.0.5`;
   const semanticKey = trackProfileKey(work.id, track.id);
   const visualReference = selectVisualReference(
     work.visualReferenceUrls,
