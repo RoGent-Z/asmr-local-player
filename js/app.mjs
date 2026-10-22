@@ -23,6 +23,8 @@ import {
 import { createPairedPlayer } from './paired-player.mjs';
 import { loadInitialLibrary } from './library-source.mjs';
 import { scanLocalFiles } from './local-library.mjs';
+import { canKeepCurrentTrack, combineLibraries, createRemoteLibrary, DEFAULT_RESOLVER } from './stream-library.mjs';
+import { createStreamWorkbench } from './stream-workbench.mjs';
 import {
   heuristicFallback,
   selectVisualReference,
@@ -98,6 +100,11 @@ let lastDialogueAutoScrollId = null;
 let dialogueManualScrollUntil = 0;
 let lastPersistAt = 0;
 let localLibrary = null;
+let baseLibraryData = { works: [], categories: [], profiles: {} };
+let remoteStorage;
+try { remoteStorage = localStorage; } catch { /* A restricted browser can still play during this visit. */ }
+const remoteLibrary = createRemoteLibrary({ storage: remoteStorage,
+  resolverBase: document.querySelector('meta[name="stream-resolver"]')?.content || DEFAULT_RESOLVER });
 let importRequest = 0;
 let trackReady = false;
 let preparedTrack = null;
@@ -106,6 +113,7 @@ let aiDisplayMode = 'bilingual';
 let aiWorkbench = null;
 let backgroundPicker = null;
 let coverPicker = null;
+let streamWorkbench = null;
 const libraryMode = document.querySelector('meta[name="library-source"]')?.content ?? 'local-files';
 let activeDialogueItemIds = new Set();
 const dialogueNodes = new Map();
@@ -253,6 +261,15 @@ coverPicker = createCoverPicker({
   onOpenChange: () => showUi(),
   onError: showToast,
 });
+streamWorkbench = createStreamWorkbench({
+  registry: remoteLibrary,
+  onChange: async (work) => {
+    if (work) { expandedWorks.add(work.id); expandedCollections.add(work.categoryPath); }
+    await applyLibrary(baseLibraryData, localLibrary, { remoteUpdate: true });
+  },
+  onReveal: (work) => { expandedWorks.add(work.id); expandedCollections.add(work.categoryPath); renderLibrary(); setActiveDrawer('library'); },
+  onOpenChange: (open) => { if (open) window.clearTimeout(hideTimer); showUi(); },
+});
 
 function formatTime(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
@@ -300,7 +317,7 @@ function setActiveDrawer(nextDrawer) {
 function scheduleHide() {
   window.clearTimeout(hideTimer);
   if (!player.paused() && activeDrawer === null && !aiWorkbench?.isOpen()
-    && !backgroundPicker?.isOpen() && !coverPicker?.isOpen() && !matchMedia('(pointer: coarse)').matches) {
+    && !backgroundPicker?.isOpen() && !coverPicker?.isOpen() && !streamWorkbench?.isOpen() && !matchMedia('(pointer: coarse)').matches) {
     hideTimer = window.setTimeout(() => {
       elements.app.classList.add('ui-hidden');
     }, 3000);
@@ -662,6 +679,13 @@ function createWorkCard(work, candidateWorkIndex) {
   thumbnail.append(chooseCover);
 
   card.append(header, thumbnail, list);
+  if (work.provider === 'asmr-one') {
+    const tools = document.createElement('div'); tools.className = 'remote-work-tools';
+    const manage = document.createElement('button'); manage.type = 'button'; manage.className = 'text-button';
+    manage.textContent = '格式 · 下载 · 管理'; manage.setAttribute('aria-haspopup','dialog');
+    manage.dataset.focusKey = `remote:${work.id}`;
+    manage.addEventListener('click',()=>streamWorkbench.open(work,manage)); tools.append(manage); card.append(tools);
+  }
   return card;
 }
 
@@ -759,6 +783,9 @@ function loadMedia(audio, url) {
     };
     audio.addEventListener('loadedmetadata', loaded, { once: true });
     audio.addEventListener('error', failed, { once: true });
+    // Set CORS before src so MediaElementAudioSource keeps receiving remote samples.
+    if (String(url).startsWith('https://') && new URL(url,location.href).origin !== location.origin) audio.crossOrigin = 'anonymous';
+    else audio.removeAttribute('crossorigin');
     audio.src = url;
     audio.load();
   });
@@ -882,7 +909,7 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
   elements.workTitle.textContent = work.title;
   elements.trackTitle.textContent = track.title;
   elements.subtitleStatus.textContent = '载入中';
-  document.title = `${track.title} · ASMR v0.0.5`;
+  document.title = `${track.title} · ASMR v0.0.6`;
   const semanticKey = trackProfileKey(work.id, track.id);
   const visualReference = selectVisualReference(
     work.visualReferenceUrls,
@@ -953,7 +980,7 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
   } catch {
     if (requestId !== loadRequest) return;
     elements.subtitleStatus.textContent = '音轨不可用';
-    showToast('此音轨无法载入');
+    showToast(work.provider === 'asmr-one' ? '此音轨无法载入，可在“在线作品”中刷新目录后重试' : '此音轨无法载入');
   }
 }
 
@@ -975,7 +1002,29 @@ function setLibraryAvailable(available) {
   }
 }
 
-async function applyLibrary(data, nextLocalLibrary = null) {
+async function applyLibrary(data, nextLocalLibrary = null, { remoteUpdate = false } = {}) {
+  const previousWork = currentWork(), previousTrack = currentTrack();
+  const previousLocal = localLibrary;
+  if (!remoteUpdate) baseLibraryData = data;
+  const combined = combineLibraries(baseLibraryData, remoteLibrary.works());
+  const nextWorks = combined.works.filter(work=>work.tracks.length > 0);
+  const nextWork = nextWorks.find(work=>work.id === previousWork?.id);
+  if (canKeepCurrentTrack(previousWork,previousTrack,nextWork)) {
+    // Adding or removing other works must not interrupt this track or revoke its Blob.
+    persistCurrent();
+    works = nextWorks; categories = combined.categories; semanticProfiles = combined.profiles;
+    localLibrary = nextLocalLibrary;
+    if (previousLocal !== localLibrary) previousLocal?.dispose();
+    workIndex = works.indexOf(nextWork); trackIndex = nextWork.tracks.findIndex(track=>track.id === previousTrack.id);
+    if (previousWork !== nextWork) {
+      coverPicker?.reset(); backgroundPicker?.workChanged(nextWork);
+      elements.workTitle.textContent = nextWork.title;
+    }
+    setLibraryAvailable(true);
+    elements.playButton.disabled = !trackReady; elements.progress.disabled = !trackReady;
+    configureListening(); renderLibrary();
+    return;
+  }
   persistCurrent();
   player.pause();
   trackReady = false;
@@ -989,18 +1038,22 @@ async function applyLibrary(data, nextLocalLibrary = null) {
   clearRightMedia();
   backgroundPicker?.workChanged(null);
   coverPicker?.reset();
-  localLibrary?.dispose();
+  if (previousLocal !== nextLocalLibrary) previousLocal?.dispose();
   localLibrary = nextLocalLibrary;
-  works = data.works.filter((work) => work.tracks.length > 0);
-  categories = data.categories ?? [];
-  semanticProfiles = data.profiles ?? {};
-  expandedWorks.clear();
-  expandedFolders.clear();
-  expandedCollections.clear();
+  works = nextWorks;
+  categories = combined.categories;
+  semanticProfiles = combined.profiles;
+  if (!remoteUpdate) {
+    expandedWorks.clear();
+    expandedFolders.clear();
+    expandedCollections.clear();
+  }
   setLibraryAvailable(works.length > 0);
   if (works.length === 0) {
-    elements.trackTitle.textContent = '选择文件夹，打开你的曲库';
-    elements.subtitleStatus.textContent = '本机读取';
+    elements.trackTitle.textContent = '添加在线作品，或打开本机曲库';
+    elements.workTitle.textContent = 'ASMR 原声播放器';
+    elements.subtitleStatus.textContent = '等待选择';
+    document.title = 'ASMR 原声播放器 · v0.0.6';
     renderLibrary();
     return;
   }
@@ -1072,6 +1125,10 @@ async function initialize() {
     const data = await loadInitialLibrary({ mode: libraryMode, baseUrl: document.baseURI });
     await applyLibrary(data);
   } catch {
+    if (remoteLibrary.works().length) {
+      await applyLibrary({works:[],categories:[],profiles:{}});
+      return;
+    }
     elements.trackTitle.textContent = '可直接选择本机曲库文件夹';
     elements.subtitleStatus.textContent = '等待选择';
     elements.importStatus.textContent = '本地服务暂不可用。也可以直接选择文件夹播放。';
@@ -1188,7 +1245,7 @@ document.addEventListener('keydown', (event) => {
     return;
   }
   const tagName = event.target?.tagName;
-  if (['INPUT', 'SELECT', 'BUTTON', 'TEXTAREA'].includes(tagName) || aiWorkbench?.isOpen() || backgroundPicker?.isOpen() || coverPicker?.isOpen()) return;
+  if (['INPUT', 'SELECT', 'BUTTON', 'TEXTAREA'].includes(tagName) || aiWorkbench?.isOpen() || backgroundPicker?.isOpen() || coverPicker?.isOpen() || streamWorkbench?.isOpen()) return;
   if (event.code === 'Space') {
     event.preventDefault();
     if (player.paused()) playAudio();
@@ -1201,6 +1258,7 @@ document.addEventListener('keydown', (event) => {
 });
 window.addEventListener('pagehide', (event) => {
   aiWorkbench?.clearKeys();
+  streamWorkbench?.cancel();
   persistCurrent();
   player.pause();
   if (event.persisted) return;

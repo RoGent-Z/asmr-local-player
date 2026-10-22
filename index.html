@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <meta name="library-source" content="local-files">
+  <meta name="stream-resolver" content="https://asmr-player-resolver.navyelf7.chatgpt.site">
   <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob: https:; object-src 'none'; base-uri 'none'; form-action 'none'">
-  <meta name="app-version" content="0.0.5">
-  <title>ASMR 原声播放器 · v0.0.5</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://asmr-player-resolver.navyelf7.chatgpt.site https://kiko-play-niptan.one https://*.kiko-play-niptan.one; media-src 'self' blob: https://kiko-play-niptan.one https://*.kiko-play-niptan.one; connect-src 'self' blob: https:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="app-version" content="0.0.6">
+  <title>ASMR 原声播放器 · v0.0.6</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -31,9 +32,10 @@
       <div id="subtitleStatus" class="status-pill">本地模式</div>
       <button id="actionsButton" class="icon-button mobile-actions-button" type="button" aria-label="打开播放器菜单" aria-expanded="false" aria-controls="topbarActions">•••</button>
       <div id="topbarActions" class="topbar-actions">
+        <button id="streamButton" class="text-button" type="button" aria-haspopup="dialog">在线作品</button>
         <button id="openFolderButton" class="text-button" type="button">打开文件夹</button>
         <button id="openFilesButton" class="text-button" type="button">选择文件</button>
-        <button id="aiButton" class="text-button ai-entry" type="button" aria-haspopup="dialog">AI 字幕 <span class="version-tag">v0.0.5</span></button>
+        <button id="aiButton" class="text-button ai-entry" type="button" aria-haspopup="dialog">AI 字幕 <span class="version-tag">v0.0.6</span></button>
         <button id="backgroundButton" class="text-button" type="button" aria-haspopup="dialog" disabled>作品背景</button>
         <button id="dialogueButton" class="text-button" type="button"
           aria-label="打开全部台词" aria-expanded="false">台词</button>
@@ -45,17 +47,18 @@
     <section id="libraryWelcome" class="library-welcome" aria-label="打开本机曲库" hidden>
       <div class="eyebrow">YOUR FILES · YOUR PLAYER</div>
       <h1>把声音，留在自己这里。</h1>
-      <p>保留双耳细节，听见每一个人。<br>本机曲库 · 多人原声 · AI 识别与翻译</p>
+      <p>保留双耳细节，听见每一个人。<br>在线作品 · 本机曲库 · AI 识别与翻译</p>
+      <button id="chooseStreamButton" class="text-button choose-stream-button" type="button" aria-haspopup="dialog">粘贴 ASMR.one 作品网址</button>
       <button id="chooseFolderButton" class="text-button choose-folder-button" type="button">选择曲库文件夹</button>
       <button id="chooseFilesButton" class="text-button choose-files-button" type="button">或选择音频、字幕与图片</button>
-      <p id="importStatus" class="import-status" role="status">播放仅在本机读取；AI 处理需自行填写接口并主动开始。<br>刷新后重新选择同一文件夹，即可恢复进度。</p>
+      <p id="importStatus" class="import-status" role="status">在线作品输入网址即可播放和下载；本机文件留在设备内。<br>在线目录自动保存；本机曲库刷新后需重新选择文件夹。</p>
     </section>
 
     <div id="drawerScrim" class="drawer-scrim" aria-hidden="true"></div>
     <aside id="drawer" class="drawer" role="dialog" aria-modal="true" aria-label="作品与音轨" aria-hidden="true" inert>
       <div class="drawer-heading">
         <div>
-          <div class="eyebrow">LOCAL LIBRARY</div>
+          <div class="eyebrow">YOUR LIBRARY</div>
           <h1>作品与音轨</h1>
         </div>
         <button id="closeDrawerButton" class="icon-button" type="button" aria-label="关闭作品库">×</button>
@@ -129,7 +132,7 @@
   </main>
 
   <dialog id="aiDialog" class="ai-dialog" aria-labelledby="aiHeading">
-    <div class="ai-heading"><div><div class="eyebrow">LISTEN · TRANSCRIBE · TRANSLATE</div><h2 id="aiHeading">AI 字幕工作台 <small>v0.0.5</small></h2></div><button id="aiClose" class="icon-button" type="button" aria-label="关闭 AI 字幕">×</button></div>
+    <div class="ai-heading"><div><div class="eyebrow">LISTEN · TRANSCRIBE · TRANSLATE</div><h2 id="aiHeading">AI 字幕工作台 <small>v0.0.6</small></h2></div><button id="aiClose" class="icon-button" type="button" aria-label="关闭 AI 字幕">×</button></div>
     <p id="aiTrackInfo" class="ai-track-info">先选择一条音轨</p>
     <form id="aiForm" autocomplete="off">
       <fieldset class="ai-task-settings"><legend>处理当前音轨</legend>
@@ -182,7 +185,7 @@
     <div class="picker-header">
     <div class="ai-heading"><div><div class="eyebrow">YOUR LIBRARY · YOUR SCENE</div><h2 id="backgroundHeading">选择作品背景</h2></div><button id="backgroundClose" class="icon-button" type="button" aria-label="关闭背景选择">×</button></div>
     <p id="backgroundWorkName" class="ai-track-info"></p>
-    <p class="field-help">从这部作品的图片中选择。图片留在本机；重新选择同一曲库后会恢复你的选择。</p>
+    <p class="field-help">从这部作品的图片中选择。选择记在当前浏览器，重新打开同一作品后恢复。</p>
     </div>
     <div id="backgroundGallery" class="background-gallery"></div>
     <div class="picker-footer"><button id="backgroundNone" class="text-button" type="button">使用默认暗色背景</button></div>
@@ -197,8 +200,34 @@
     <div id="coverGallery" class="background-gallery"></div>
     <div class="picker-footer">
     <div class="cover-actions"><button id="coverAutomatic" class="text-button" type="button">恢复自动选择</button><button id="coverLater" class="text-button" type="button">稍后选择</button></div>
-    <p class="field-help">只更改曲库封面，不影响播放器背景。图片留在本机，选择记在当前浏览器。</p>
+    <p class="field-help">只更改曲库封面，不影响播放器背景。选择记在当前浏览器。</p>
     </div>
+  </dialog>
+  <dialog id="streamDialog" class="stream-dialog" aria-labelledby="streamHeading">
+    <div class="ai-heading"><div><div class="eyebrow">ONE LINK · PRESS PLAY</div><h2 id="streamHeading">在线作品 <small>v0.0.6</small></h2></div><button id="streamClose" class="icon-button" type="button" aria-label="关闭在线作品">×</button></div>
+    <p class="stream-intro">粘贴 ASMR.one 作品网址，自动加入作品库。</p>
+    <form id="streamForm" class="stream-form">
+      <label for="streamUrl">作品网址</label>
+      <div class="stream-url-row"><input id="streamUrl" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://asmr.one/work/RJ01603178" required><button id="streamAdd" class="text-button" type="submit">添加作品</button></div>
+    </form>
+    <p id="streamStatus" class="stream-status" role="status" aria-live="polite">无需账号或接口设置。默认使用 MP3，没有 MP3 时使用 WAV。</p>
+    <progress id="streamProgress" class="stream-progress" max="1" value="0" aria-label="作品读取与下载进度"></progress>
+    <div class="stream-library-controls">
+      <label for="streamWork">已添加的在线作品</label><select id="streamWork"></select>
+      <p id="streamDetails" class="field-help"></p>
+      <div class="stream-options"><label for="streamFormat">播放与下载格式</label><select id="streamFormat"><option value="mp3">MP3</option><option value="wav">WAV</option><option value="all">MP3 + WAV</option></select></div>
+      <details id="streamFilesPanel" class="stream-files-panel">
+        <summary>自选下载文件 <span id="streamSelectionCount">0/0 已选</span></summary>
+        <fieldset id="streamFilesControls" class="stream-files-controls">
+          <legend class="visually-hidden">当前格式的下载文件</legend>
+          <div class="stream-file-actions"><button id="streamSelectAll" class="text-button" type="button">全选</button><button id="streamSelectNone" class="text-button" type="button">清空</button></div>
+          <div id="streamFileList" class="stream-file-list" role="group" aria-label="按文件选择下载"></div>
+        </fieldset>
+      </details>
+      <div class="stream-actions"><button id="streamReveal" class="text-button" type="button">查看音轨</button><button id="streamDownload" class="text-button" type="button">下载作品</button><button id="streamRefresh" class="text-button" type="button">刷新目录</button><button id="streamRemove" class="text-button" type="button">移除作品</button></div>
+      <p class="field-help">默认勾选当前格式音频、同名字幕、目录图片与官方封面，也可展开“自选下载文件”逐项选择。下载状态以浏览器或系统文件为准。</p>
+    </div>
+    <div class="stream-footer"><button id="streamCancel" class="text-button" type="button" disabled>取消当前任务</button><span class="field-help">目录与进度保存在当前浏览器。</span></div>
   </dialog>
   <script type="module" src="./js/app.mjs"></script>
 </body>

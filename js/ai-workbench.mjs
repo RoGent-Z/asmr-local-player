@@ -1,9 +1,18 @@
 import { runSpeechJob } from './speech-job.mjs';
 import { decodeSubtitleBytes } from './subtitles.mjs';
+import { isTrustedRemoteAudio } from './stream-library.mjs';
 import { displaySourceCues, exportTimedText, makeTranscriptDocument, parseTimedText, readTranscriptDocument } from './transcript.mjs';
 
 const SETTINGS_KEY = 'asmr-player:ai-settings:v1';
 const settingIds = ['asrEndpoint', 'asrModel', 'asrFormat', 'translationEndpoint', 'translationModel', 'aiSourceLanguage', 'aiTargetLanguage'];
+
+export function canReadAiAudio(source, baseUrl) {
+  try {
+    const url = new URL(source.audioUrl,baseUrl);
+    return url.protocol === 'blob:' || url.origin === new URL(baseUrl).origin
+      || (source.remoteProvider === 'asmr-one' && isTrustedRemoteAudio(url.href));
+  } catch { return false; }
+}
 
 export function safeAiSettings(values) {
   return Object.fromEntries(settingIds.flatMap((id) => {
@@ -107,9 +116,9 @@ export function createAiWorkbench({ getContext, onApply, onRestore, onOpenChange
       if (el.aiTaskMode.value !== 'audio') return input;
       if (source.blob) return { ...input, blob: source.blob };
       const url = new URL(source.audioUrl, location.href);
-      if (url.protocol !== 'blob:' && url.origin !== location.origin) throw new Error('音源必须来自本机选择的文件或本站本地服务');
+      if (!canReadAiAudio(source,location.href)) throw new Error('音源必须来自本机文件、本站服务或已解析的作品来源');
       const response = await fetch(url, { signal, credentials: 'omit', redirect: 'error' });
-      if (!response.ok) throw new Error('无法读取本机音频，请重新选择曲库');
+      if (!response.ok) throw new Error('无法读取当前音频，请重新选择曲库或刷新作品目录');
       return { ...input, blob: await response.blob() };
     }));
   }
@@ -226,7 +235,7 @@ export function createAiWorkbench({ getContext, onApply, onRestore, onOpenChange
     const url = URL.createObjectURL(new Blob([text], { type: format === 'json' ? 'application/json' : 'text/plain;charset=utf-8' }));
     const link = document.createElement('a'); link.href = url;
     const sourceNumber = Math.max(0, doc.sources.indexOf(selected)) + 1;
-    link.download = `asmr-v0.0.5-${format === 'json' ? 'all' : `source${sourceNumber}`}-${el.aiDisplayMode.value}.${format}`;
+    link.download = `asmr-v0.0.6-${format === 'json' ? 'all' : `source${sourceNumber}`}-${el.aiDisplayMode.value}.${format}`;
     link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
   el.aiImport.addEventListener('click', () => el.aiImportFile.click());

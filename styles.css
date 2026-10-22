@@ -1099,3 +1099,53 @@ button:disabled:hover { transform: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0s !important; }
 }
+
+.choose-stream-button { display: block; margin: 0 auto 14px; background: #ede6f4; color: #241a30; }
+.stream-dialog { width: min(640px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; color: #eee7f5; background: #17121f; border: 1px solid #ffffff24; border-radius: 20px; padding: 26px; box-shadow: 0 24px 100px #0008; }
+.stream-dialog::backdrop { background: #08050cbd; backdrop-filter: blur(10px); }
+.stream-dialog h2 { margin: 0; font-size: 26px; }
+.stream-dialog h2 small { font-size: 12px; color: #b9a9c7; }
+.stream-dialog > .ai-heading { position: sticky; top: -26px; z-index: 2; margin: -26px -26px 0; padding: 20px 26px 14px; background: #17121f; }
+.stream-dialog .field-help { color: #b9aaba; font-size: 12px; line-height: 1.7; }
+.stream-intro { color: #d2c6dc; line-height: 1.7; }
+.stream-form > label, .stream-library-controls > label { display: block; margin-bottom: 8px; font-size: 13px; color: #cbbbd8; }
+.stream-url-row { display: flex; gap: 10px; align-items: stretch; }
+.stream-dialog input, .stream-dialog select { min-width: 0; min-height: 44px; border: 1px solid #ffffff2e; border-radius: 9px; background: #ffffff09; color: #f4edf8; padding: 10px 12px; font: inherit; }
+.stream-dialog option { background: #201929; color: #f4edf8; }
+.stream-url-row input { flex: 1; width: 0; font-size: 14px; }
+.stream-dialog .text-button { min-height: 44px; white-space: nowrap; }
+.stream-status { font-size: 13px; line-height: 1.7; color: #c9bfd2; min-height: 44px; overflow-wrap: anywhere; }
+.stream-status[data-error="true"] { color: #f4a9ba; }
+.stream-progress { width: 100%; height: 5px; accent-color: #c5adff; display: block; margin-bottom: 24px; }
+.stream-library-controls { border-top: 1px solid #ffffff1a; padding-top: 20px; }
+.stream-library-controls > select { width: 100%; text-overflow: ellipsis; }
+.stream-options { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 18px 0 14px; font-size: 13px; }
+.stream-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.stream-files-panel { margin: 0 0 16px; border: 1px solid #ffffff20; border-radius: 10px; overflow: hidden; }
+.stream-files-panel > summary { min-height: 44px; padding: 12px; cursor: pointer; font-size: 13px; line-height: 1.5; }
+.stream-files-panel > summary > span { float: right; color: #b8a8c6; font-size: 12px; }
+.stream-files-controls { min-width: 0; margin: 0; padding: 0; border: 0; }
+.stream-file-actions { display: flex; gap: 8px; padding: 0 10px 8px; }
+.stream-file-list { max-height: min(260px, 34dvh); overflow: auto; overscroll-behavior: contain; touch-action: pan-y; scrollbar-width: thin; }
+.stream-file-choice { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 9px 12px; border-top: 1px solid #ffffff12; cursor: pointer; }
+.stream-file-choice:hover { background: #ffffff07; }
+.stream-file-choice:focus-within { background: #d4baff10; }
+.stream-file-choice input { width: 20px; height: 20px; min-height: 20px; flex: 0 0 20px; margin: 0; padding: 0; accent-color: #cfb4ff; }
+.stream-file-description { display: grid; min-width: 0; gap: 4px; }
+.stream-file-path { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; font-size: 12px; line-height: 1.55; }
+.stream-file-meta { color: #aa9db6; font-size: 11px; }
+.stream-file-list > .field-help { padding: 0 12px; }
+.stream-dialog .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.stream-footer { border-top: 1px solid #ffffff1a; display: flex; align-items: center; gap: 16px; margin-top: 20px; padding-top: 18px; }
+.remote-work-tools { display: flex; justify-content: flex-end; padding: 8px 10px 2px; }
+.remote-work-tools button { min-height: 44px; font-size: 12px; }
+.stream-dialog :focus-visible { outline: 2px solid #d4baff; outline-offset: 3px; }
+@media (max-width: 600px) {
+  .stream-dialog { width: calc(100vw - 16px); max-width: calc(100vw - 16px); max-height: calc(100dvh - 16px); padding: 18px 15px; border-radius: 14px; }
+  .stream-dialog > .ai-heading { top: -18px; margin: -18px -15px 0; padding: 16px 15px 12px; }
+  .stream-url-row { flex-direction: column; }
+  .stream-url-row input { width: 100%; flex: auto; font-size: 16px; }
+  .stream-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .stream-footer { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .choose-stream-button { max-width: 100%; font-size: 13px; }
+}

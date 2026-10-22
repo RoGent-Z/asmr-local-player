@@ -8,7 +8,8 @@ export function coverPriority(path) {
 export function selectWorkCover(candidates, savedPath, failedPaths = new Set()) {
   const available = candidates.filter(item => !failedPaths.has(item.path));
   const saved = available.find(item => item.path === savedPath);
-  const priority = Math.min(...available.map(item => coverPriority(item.path)));
-  const choices = available.filter(item => coverPriority(item.path) === priority);
+  const priorityOf = item => item.official ? -1 : coverPriority(item.path);
+  const priority = Math.min(...available.map(priorityOf));
+  const choices = available.filter(item => priorityOf(item) === priority);
   return { image: saved ?? (choices.length === 1 ? choices[0] : null), choices, needsChoice: !saved && choices.length > 1 };
 }

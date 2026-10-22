@@ -1,0 +1,22 @@
+Remote work download dependencies
+=================================
+
+client-zip 2.5.0
+Author: David Junger
+Project: https://github.com/Touffy/client-zip
+Vendored distribution: https://unpkg.com/client-zip@2.5.0/index.js
+Local module: ../js/vendor/client-zip-2.5.0.mjs
+Local SHA-256 (including final newline):
+8168da2ee05a4e81830c30e088dc44bdd4adb84ef93a8b1327730ed7a93a6e4f
+License: MIT; full text in client-zip-LICENSE.txt next to this notice.
+The distribution is stored locally and is never loaded from a CDN at runtime.
+
+The same-origin download response design was informed by the documented
+ServiceWorker download technique in StreamSaver.js:
+https://github.com/jimmywarting/StreamSaver.js
+No StreamSaver source is included; no external middleman page, worker,
+extension, hosted proxy, account or local helper is used by this module.
+
+The application download-worker.mjs, stream-download.mjs and work-zip.mjs are
+project code. ZIP64 streaming generation is provided by client-zip. The
+bounded compatibility ZIP32 writer is project code and emits stored entries.

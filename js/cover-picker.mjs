@@ -44,9 +44,10 @@ export function createCoverPicker({ onChange = () => {}, onOpenChange = () => {}
     const preferred = new Set(state.choices.map(item => item.path));
     document.querySelector('#coverHelp').textContent = state.needsChoice
       ? `有 ${state.choices.length} 张同优先级图片，请选择一张作为曲库封面。`
-      : '优先封面名称，其次作品根目录，再其次子目录。你也可以选择其他图片。';
+      : work.provider === 'asmr-one' ? '默认使用官方封面。你也可以选择作品目录里的其他图片。'
+        : '优先封面名称，其次作品根目录，再其次子目录。你也可以选择其他图片。';
     gallery.replaceChildren();
-    const candidates = [...(work.backgroundCandidates ?? [])].sort((a,b) => coverPriority(a.path)-coverPriority(b.path) || a.path.localeCompare(b.path, 'zh-CN', {numeric:true}));
+    const candidates = [...(work.backgroundCandidates ?? [])].sort((a,b) => (a.official ? -1 : coverPriority(a.path))-(b.official ? -1 : coverPriority(b.path)) || a.path.localeCompare(b.path, 'zh-CN', {numeric:true}));
     for (const candidate of candidates) {
       const button = document.createElement('button');
       button.type = 'button'; button.className = `background-choice${preferred.has(candidate.path) ? ' recommended' : ''}`;

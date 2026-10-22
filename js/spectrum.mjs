@@ -846,6 +846,7 @@ export function createSpectrumRenderer({
     }
     try {
       const image = new Image();
+      if (/^https:/i.test(url)) image.crossOrigin = 'anonymous';
       image.decoding = 'async';
       image.src = url;
       await image.decode();
@@ -875,6 +876,7 @@ export function createSpectrumRenderer({
       const loaded = await Promise.all(
         urls.map((url) => {
           const img = new Image();
+          if (/^https:/i.test(url)) img.crossOrigin = 'anonymous';
           if ('decoding' in img) img.decoding = 'async';
           img.src = url;
           if (typeof img.decode === 'function') {
