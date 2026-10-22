@@ -19,12 +19,22 @@ jobs:
           cd "$RUNNER_TEMP/asmr-network-probe"
           npm init -y > /dev/null
           npm install --no-audit --no-fund playwright@1.62.1
-          npx playwright install --with-deps chromium
+          if command -v google-chrome > /dev/null; then
+            export PROBE_CHROME_CHANNEL=chrome
+          else
+            npx playwright install --with-deps chromium
+          fi
           cat > probe.mjs <<'JS'
           import assert from 'node:assert/strict';
           import {chromium} from 'playwright';
-          const browser=await chromium.launch({headless:true});
+          const browser=await chromium.launch({headless:true,args:['--mute-audio'],...(process.env.PROBE_CHROME_CHANNEL?{channel:process.env.PROBE_CHROME_CHANNEL}:{})});
           const context=await browser.newContext();
+          await context.addInitScript(()=>{
+            Object.defineProperty(window,'showDirectoryPicker',{value:undefined,configurable:true});
+            window.__audioContexts=[];
+            const Original=window.AudioContext;
+            if(Original)window.AudioContext=class extends Original{constructor(...args){super(...args);window.__audioContexts.push(this);}};
+          });
           const page=await context.newPage();
           try {
             await page.goto(process.env.PLAYER,{waitUntil:'networkidle'});
@@ -40,6 +50,45 @@ jobs:
             assert.equal(result.workId,'1603178');assert.equal(result.version,'0.0.6');assert.ok(result.audio>0);
             for(const key of ['coverHead','audioHead','subtitleHead'])assert.equal(result[key],200,key);
             console.log('V006_ANONYMOUS_RESULT '+JSON.stringify({...result,githubOrigin:true,credentials:'omit',realProvider:true}));
+            assert.equal(await page.locator('meta[name="app-version"]').getAttribute('content'),'0.0.6');
+            await page.locator('#chooseStreamButton').click();
+            await page.locator('#streamUrl').fill('https://asmr.one/work/RJ01603178');
+            await page.locator('#streamAdd').click();
+            await page.waitForFunction(()=>document.querySelector('#streamStatus').textContent.startsWith('已添加'),null,{timeout:45000});
+            await page.waitForFunction(()=>!document.querySelector('#playButton').disabled);
+            const imported=await page.evaluate(()=>{
+              const stored=JSON.parse(localStorage.getItem('asmr-player:remote-library:v1'));
+              return {works:stored.length,entries:stored[0].manifest.entries.length,format:document.querySelector('#streamFormat').value,crossOrigin:document.querySelector('#audioLeft').crossOrigin};
+            });
+            assert.equal(imported.works,1);assert.equal(imported.entries,result.entries);assert.equal(imported.format,'mp3');assert.equal(imported.crossOrigin,'anonymous');
+            await page.locator('#streamClose').click();
+            await page.locator('#playButton').click();
+            await page.waitForFunction(()=>document.querySelector('#audioLeft').currentTime>.3);
+            await page.locator('#progress').evaluate(n=>{n.value='500';n.dispatchEvent(new Event('input',{bubbles:true}));});
+            await page.waitForFunction(()=>{const a=document.querySelector('#audioLeft');return a.currentTime>a.duration*.4;});
+            const playback=await page.evaluate(()=>({advanced:document.querySelector('#audioLeft').currentTime>.3,audioContextRunning:window.__audioContexts.some(c=>c.state==='running'),seek:true}));
+            assert.equal(playback.audioContextRunning,true);
+            await page.locator('#playButton').click();
+            await page.reload({waitUntil:'networkidle'});
+            if(await page.locator('#backgroundDialog').isVisible())await page.locator('#backgroundNone').click();
+            await page.waitForFunction(()=>!document.querySelector('#playButton').disabled);
+            assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('asmr-player:remote-library:v1')).length),1);
+            await page.locator('#streamButton').click();
+            await page.locator('#streamFilesPanel summary').click();
+            await page.locator('#streamSelectNone').click();
+            await page.locator('#streamFileList input').evaluateAll(nodes=>{
+              nodes.find(n=>/\.mp3$/i.test(n.dataset.path)).click();
+              nodes.find(n=>n.dataset.path==='official-cover.jpg').click();
+            });
+            const downloadPromise=page.waitForEvent('download',{timeout:45000});
+            await page.locator('#streamDownload').click();
+            const download=await downloadPromise;
+            await download.saveAs(process.env.RUNNER_TEMP+'/v006-live-transient.zip');
+            await page.waitForFunction(()=>document.querySelector('#streamStatus').textContent.includes('交给浏览器'),null,{timeout:45000});
+            const fs=await import('node:fs/promises');
+            const bytes=(await fs.stat(process.env.RUNNER_TEMP+'/v006-live-transient.zip')).size;
+            assert.ok(bytes>1000);await fs.unlink(process.env.RUNNER_TEMP+'/v006-live-transient.zip');
+            console.log('V006_LIVE_UI_RESULT '+JSON.stringify({version:'0.0.6',imported,playback,persisted:true,streamingZip:true,selectedFiles:2,zipBytes:bytes,originalMediaArtifactRetained:false,realProvider:true,realPhone:false}));
           }finally{await browser.close();}
           JS
           node probe.mjs
