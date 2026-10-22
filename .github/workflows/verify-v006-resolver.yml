@@ -1,0 +1,45 @@
+name: Verify v006 anonymous resolver
+on:
+  push:
+    branches: [qa/v006-resolver]
+permissions:
+  contents: read
+jobs:
+  anonymous-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check anonymous requests from the public GitHub player origin
+        env:
+          RESOLVER: https://asmr-player-resolver.navyelf7.chatgpt.site
+          PLAYER: https://rogent-z.github.io/asmr-local-player/
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/asmr-network-probe"
+          cd "$RUNNER_TEMP/asmr-network-probe"
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund playwright@1.62.1
+          npx playwright install --with-deps chromium
+          cat > probe.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import {chromium} from 'playwright';
+          const browser=await chromium.launch({headless:true});
+          const context=await browser.newContext();
+          const page=await context.newPage();
+          try {
+            await page.goto(process.env.PLAYER,{waitUntil:'networkidle'});
+            const result=await page.evaluate(async resolver=>{
+              const health=await fetch(resolver+'/health',{credentials:'omit'});
+              if(!health.ok)throw new Error('Anonymous health HTTP '+health.status);
+              const r=await fetch(resolver+'/api/resolve?url='+encodeURIComponent('https://asmr.one/work/RJ01603178'),{credentials:'omit'});
+              if(!r.ok)throw new Error('Anonymous resolve HTTP '+r.status);
+              const work=await r.json(),audio=work.entries.find(e=>e.type==='audio'),sub=work.entries.find(e=>e.type==='subtitle');
+              const checks=await Promise.all([work.coverUrl,audio.url,sub.url].map(async url=>{const response=await fetch(url,{method:'HEAD',credentials:'omit'});return response.status;}));
+              return {health:health.status,version:(await health.json()).version,workId:work.workId,entries:work.entries.length,audio:work.entries.filter(e=>e.type==='audio').length,coverHead:checks[0],audioHead:checks[1],subtitleHead:checks[2]};
+            },process.env.RESOLVER);
+            assert.equal(result.workId,'1603178');assert.equal(result.version,'0.0.6');assert.ok(result.audio>0);
+            for(const key of ['coverHead','audioHead','subtitleHead'])assert.equal(result[key],200,key);
+            console.log('V006_ANONYMOUS_RESULT '+JSON.stringify({...result,githubOrigin:true,credentials:'omit',realProvider:true}));
+          }finally{await browser.close();}
+          JS
+          node probe.mjs
