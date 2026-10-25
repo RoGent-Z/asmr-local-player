@@ -968,15 +968,22 @@ input[type="range"] {
 .library-welcome {
   position: absolute;
   z-index: 20;
-  top: 43%;
+  display: flex;
+  flex-direction: column;
+  justify-content: safe center;
+  top: 100px;
+  bottom: 0;
   left: 50%;
   width: min(760px, calc(100vw - 36px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 36px 20px;
   text-align: center;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   background: radial-gradient(ellipse at center, rgba(12, 10, 16, .96) 25%, rgba(12, 10, 16, .72) 60%, transparent 74%);
 }
 
+.library-welcome > * { flex-shrink: 0; }
 .library-welcome[hidden] { display: none; }
 .library-welcome h1 { margin: 20px 0 18px; font-size: clamp(25px, 3.2vw, 38px); font-weight: 500; letter-spacing: .04em; }
 .library-welcome p { color: #cbc1d0; line-height: 1.85; font-size: 15px; }
@@ -998,7 +1005,8 @@ input[type="range"] {
 .remembered-work .work-header { cursor: default; }
 .library-welcome .import-status { min-height: 3.7em; margin-top: 16px; font-size: 12px; color: #a499ad; }
 .awaiting-library .center-spectrum { opacity: .2; }
-.awaiting-library .controls { opacity: .32; }
+.app.awaiting-library { min-height: 100dvh; }
+.awaiting-library .controls { display: none; }
 button:disabled, input:disabled, select:disabled { cursor: default; opacity: .4; }
 button:disabled:hover { transform: none; }
 .topbar .text-button { white-space: nowrap; flex-shrink: 0; }
@@ -1063,7 +1071,7 @@ button:disabled:hover { transform: none; }
   .topbar .now-playing { min-width: 0; flex: 1; }
   .topbar .text-button { padding: 8px 10px; font-size: 12px; }
   .topbar .status-pill { display: none; }
-  .library-welcome { top: 43%; padding: 26px 12px; }
+  .library-welcome { top: 82px; padding: 26px 12px; }
   .library-welcome p { font-size: 13px; }
   .library-welcome .import-status { font-size: 11px; }
   .welcome-actions { grid-template-columns: 1fr; gap: 8px; margin: 18px 0 10px; }
@@ -1100,6 +1108,13 @@ button:disabled:hover { transform: none; }
 }
 
 @media (max-width: 900px) and (max-height: 500px) {
+  .app.awaiting-library { min-height: 100dvh; }
+  .library-welcome { top: 72px; padding: 16px 20px; }
+  .library-welcome h1 { margin: 10px 0; font-size: 26px; }
+  .library-welcome p { margin: 8px 0; font-size: 13px; }
+  .welcome-actions { margin: 14px 0 8px; }
+  .library-welcome .welcome-action { height: 50px; }
+  .library-welcome .import-status { margin-top: 8px; min-height: 0; font-size: 11px; }
   html, body { overflow-y: auto; }
   .app { min-height: 500px; }
   .topbar { min-height: 64px; padding-top: 8px; padding-bottom: 8px; }
