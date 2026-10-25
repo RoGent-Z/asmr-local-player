@@ -1,6 +1,6 @@
 import { runSpeechJob } from './speech-job.mjs';
 import { decodeSubtitleBytes } from './subtitles.mjs';
-import { isTrustedRemoteAudio } from './stream-library.mjs';
+import { isTrustedRemoteAudio, isTrustedResolverAsset } from './stream-library.mjs';
 import { displaySourceCues, exportTimedText, makeTranscriptDocument, parseTimedText, readTranscriptDocument } from './transcript.mjs';
 
 const SETTINGS_KEY = 'asmr-player:ai-settings:v1';
@@ -10,8 +10,14 @@ export function canReadAiAudio(source, baseUrl) {
   try {
     const url = new URL(source.audioUrl,baseUrl);
     return url.protocol === 'blob:' || url.origin === new URL(baseUrl).origin
-      || (source.remoteProvider === 'asmr-one' && isTrustedRemoteAudio(url.href));
+      || (source.remoteProvider === 'asmr-one' && isTrustedRemoteAudio(url.href))
+      || (source.remoteProvider === 'web' && isTrustedResolverAsset(url.href,source));
   } catch { return false; }
+}
+
+export function assertAiAudioFormat(source) {
+  const format = source.audioFormat || /\.([a-z\d]+)$/i.exec(source.name || source.id || '')?.[1]?.toLowerCase();
+  if (format && !['mp3','wav'].includes(format)) throw new Error(`当前音源为 ${format.toUpperCase()}；AI 音频识别目前支持 MP3 与 WAV。请转换格式后选择文件，或导入已有台本翻译。`);
 }
 
 export function safeAiSettings(values) {
@@ -114,6 +120,7 @@ export function createAiWorkbench({ getContext, onApply, onRestore, onOpenChange
     return Promise.all(context.sources.map(async (source) => {
       const input = { id: source.id, label: source.label, side: source.side, name: source.name || source.id, cues: source.cues ?? [] };
       if (el.aiTaskMode.value !== 'audio') return input;
+      assertAiAudioFormat(source);
       if (source.blob) return { ...input, blob: source.blob };
       const url = new URL(source.audioUrl, location.href);
       if (!canReadAiAudio(source,location.href)) throw new Error('音源必须来自本机文件、本站服务或已解析的作品来源');
@@ -235,7 +242,7 @@ export function createAiWorkbench({ getContext, onApply, onRestore, onOpenChange
     const url = URL.createObjectURL(new Blob([text], { type: format === 'json' ? 'application/json' : 'text/plain;charset=utf-8' }));
     const link = document.createElement('a'); link.href = url;
     const sourceNumber = Math.max(0, doc.sources.indexOf(selected)) + 1;
-    link.download = `asmr-v0.0.6-${format === 'json' ? 'all' : `source${sourceNumber}`}-${el.aiDisplayMode.value}.${format}`;
+    link.download = `asmr-v0.0.7-${format === 'json' ? 'all' : `source${sourceNumber}`}-${el.aiDisplayMode.value}.${format}`;
     link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
   el.aiImport.addEventListener('click', () => el.aiImportFile.click());

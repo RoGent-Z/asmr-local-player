@@ -17,13 +17,13 @@ import {
 } from './player-state.mjs';
 import {
   countFolderTracks,
-  resolveCategoryWorks,
   resolveFolderTracks,
 } from './library-tree.mjs';
 import { createPairedPlayer } from './paired-player.mjs';
 import { loadInitialLibrary } from './library-source.mjs';
 import { scanLocalFiles } from './local-library.mjs';
-import { canKeepCurrentTrack, combineLibraries, createRemoteLibrary, DEFAULT_RESOLVER } from './stream-library.mjs';
+import { createLocalCache, readDirectoryFiles } from './local-cache.mjs';
+import { canKeepCurrentTrack, combineLibraries, createRemoteLibrary, DEFAULT_RESOLVER, isOnlineWork } from './stream-library.mjs';
 import { createStreamWorkbench } from './stream-workbench.mjs';
 import {
   heuristicFallback,
@@ -46,6 +46,7 @@ const elements = {
   closeDrawerButton: document.querySelector('#closeDrawerButton'),
   chooseFolderButton: document.querySelector('#chooseFolderButton'),
   chooseFilesButton: document.querySelector('#chooseFilesButton'),
+  clearLocalCacheButton: document.querySelector('#clearLocalCacheButton'),
   currentTime: document.querySelector('#currentTime'),
   dialogueButton: document.querySelector('#dialogueButton'),
   dialogueDrawer: document.querySelector('#dialogueDrawer'),
@@ -61,6 +62,8 @@ const elements = {
   leftSubtitles: document.querySelector('#leftSubtitles'),
   library: document.querySelector('#library'),
   libraryWelcome: document.querySelector('#libraryWelcome'),
+  localCacheStatus: document.querySelector('#localCacheStatus'),
+  restoreLibraryButton: document.querySelector('#restoreLibraryButton'),
   listeningMode: document.querySelector('#listeningMode'),
   syncMode: document.querySelector('#syncMode'),
   menuButton: document.querySelector('#menuButton'),
@@ -101,11 +104,19 @@ let dialogueManualScrollUntil = 0;
 let lastPersistAt = 0;
 let localLibrary = null;
 let baseLibraryData = { works: [], categories: [], profiles: {} };
+const localCache = createLocalCache();
+let rememberedWorks = [];
+let cacheSaveController = null;
+let cacheRestoreRequest = 0;
+let cacheSaveRequest = 0;
+let cacheWriteGeneration = 0;
+const librarySort = new Intl.Collator('zh-CN', {numeric:true,sensitivity:'base'});
 let remoteStorage;
 try { remoteStorage = localStorage; } catch { /* A restricted browser can still play during this visit. */ }
 const remoteLibrary = createRemoteLibrary({ storage: remoteStorage,
   resolverBase: document.querySelector('meta[name="stream-resolver"]')?.content || DEFAULT_RESOLVER });
 let importRequest = 0;
+let directoryPickerRequest = 0;
 let trackReady = false;
 let preparedTrack = null;
 let aiDocument = null;
@@ -601,6 +612,8 @@ function createWorkCard(work, candidateWorkIndex) {
   const card = document.createElement('section');
   const expanded = expandedWorks.has(work.id);
   card.className = `work-card${candidateWorkIndex === workIndex ? ' active' : ''}${expanded ? ' expanded' : ''}`;
+  card.dataset.workId = work.id;
+  card.dataset.provider = work.provider || 'local';
 
   const header = document.createElement('button');
   header.type = 'button';
@@ -616,7 +629,13 @@ function createWorkCard(work, candidateWorkIndex) {
   const meta = document.createElement('div');
   meta.className = 'work-meta';
   meta.textContent = `${work.tracks.length} 条音轨`;
-  heading.append(name, meta);
+  const nameRow = document.createElement('div'); nameRow.className = 'work-name-row'; nameRow.append(name);
+  if (isOnlineWork(work)) {
+    const badge = document.createElement('span'); badge.className = 'work-cloud-badge'; badge.title = '在线作品';
+    badge.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="在线作品" focusable="false"><title>在线作品</title><path d="M7 19h11a4 4 0 0 0 .6-8A6.5 6.5 0 0 0 6 9.5 4.8 4.8 0 0 0 7 19Z"/></svg>';
+    nameRow.append(badge);
+  }
+  heading.append(nameRow, meta);
   const chevron = document.createElement('span');
   chevron.className = 'chevron';
   chevron.textContent = '⌄';
@@ -679,7 +698,7 @@ function createWorkCard(work, candidateWorkIndex) {
   thumbnail.append(chooseCover);
 
   card.append(header, thumbnail, list);
-  if (work.provider === 'asmr-one') {
+  if (isOnlineWork(work)) {
     const tools = document.createElement('div'); tools.className = 'remote-work-tools';
     const manage = document.createElement('button'); manage.type = 'button'; manage.className = 'text-button';
     manage.textContent = '格式 · 下载 · 管理'; manage.setAttribute('aria-haspopup','dialog');
@@ -689,79 +708,35 @@ function createWorkCard(work, candidateWorkIndex) {
   return card;
 }
 
-function renderCategoryNode(category) {
-  const categoryWorks = resolveCategoryWorks(works, category);
-  const expanded = expandedCollections.has(category.id);
-  const collection = document.createElement('section');
-  collection.className = `collection-node${expanded ? ' expanded' : ''}`;
-
-  const header = document.createElement('button');
-  header.type = 'button';
-  header.className = 'collection-header';
-  header.dataset.focusKey = `collection:${category.id}`;
-  header.setAttribute('aria-expanded', String(expanded));
-  const chevron = document.createElement('span');
-  chevron.className = 'collection-chevron';
-  chevron.textContent = '⌄';
-  const name = document.createElement('span');
-  name.className = 'collection-name';
-  name.textContent = category.title;
-  const count = document.createElement('span');
-  count.className = 'collection-count';
-  count.textContent = `${categoryWorks.length} 部`;
-  header.append(chevron, name, count);
-  header.addEventListener('click', () => {
-    if (expandedCollections.has(category.id)) {
-      expandedCollections.delete(category.id);
-    } else {
-      expandedCollections.add(category.id);
-    }
-    renderLibrary();
-  });
-
-  const body = document.createElement('div');
-  body.className = 'collection-works';
-  for (const work of categoryWorks) {
-    const candidateWorkIndex = works.findIndex(
-      (candidate) => candidate.id === work.id,
-    );
-    if (candidateWorkIndex !== -1) {
-      body.append(createWorkCard(work, candidateWorkIndex));
-    }
-  }
-  collection.append(header, body);
-  return collection;
+function createRememberedWorkCard(work) {
+  const card=document.createElement('section');card.className='work-card remembered-work';card.dataset.workId=work.id;
+  card.dataset.provider='local';
+  const header=document.createElement('button');header.type='button';header.className='work-header';header.dataset.focusKey=`restore:${work.id}`;
+  header.setAttribute('aria-label',`${work.title} · 恢复曲库访问`);
+  const heading=document.createElement('div');heading.style.minWidth='0';
+  const name=document.createElement('div');name.className='work-name';name.textContent=work.title;name.title=work.title;
+  const meta=document.createElement('div');meta.className='work-meta';meta.textContent=`已记住 · ${work.trackCount || 0} 条音轨 · 点击恢复访问`;
+  heading.append(name,meta);header.append(heading);header.addEventListener('click',()=>restoreLocalLibrary(true));card.append(header);
+  return card;
 }
 
 function renderLibrary() {
   const scrollTop = elements.drawer.scrollTop;
   const focusKey = elements.drawer.contains(document.activeElement) ? document.activeElement?.dataset.focusKey : null;
   elements.library.replaceChildren();
-  if (works.length === 0) {
+  const displayedWorks=[...works,...rememberedWorks.filter(remembered=>!works.some(work=>work.id === remembered.id))]
+    .sort((a,b)=>librarySort.compare(a.title,b.title) || librarySort.compare(a.id,b.id));
+  if (displayedWorks.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'empty-state';
-    empty.textContent = '没有发现一级 RJ* 作品文件夹。';
+    empty.textContent = '添加作品网址，或选择本机音频与文件夹。';
     elements.library.append(empty);
     return;
   }
 
-  const renderedCategories = categories.length > 0
-    ? categories
-    : [{ id: '', title: '', workIds: works.map((work) => work.id) }];
-  for (const category of renderedCategories) {
-    const categoryWorks = resolveCategoryWorks(works, category);
-    if (category.id === '') {
-      for (const work of categoryWorks) {
-        const candidateWorkIndex = works.findIndex(
-          (candidate) => candidate.id === work.id,
-        );
-        if (candidateWorkIndex !== -1) {
-          elements.library.append(createWorkCard(work, candidateWorkIndex));
-        }
-      }
-    } else if (categoryWorks.length > 0) {
-      elements.library.append(renderCategoryNode(category));
-    }
+  for (const work of displayedWorks) {
+    const candidateWorkIndex=works.findIndex(candidate=>candidate.id === work.id);
+    elements.library.append(candidateWorkIndex === -1 ? createRememberedWorkCard(work) : createWorkCard(work,candidateWorkIndex));
   }
   if (focusKey && !document.querySelector('dialog[open]')) [...elements.library.querySelectorAll('[data-focus-key]')].find(node => node.dataset.focusKey === focusKey)?.focus({ preventScroll:true });
   elements.drawer.scrollTop = scrollTop;
@@ -909,7 +884,7 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
   elements.workTitle.textContent = work.title;
   elements.trackTitle.textContent = track.title;
   elements.subtitleStatus.textContent = '载入中';
-  document.title = `${track.title} · ASMR v0.0.6`;
+  document.title = `${track.title} · ASMR v0.0.7`;
   const semanticKey = trackProfileKey(work.id, track.id);
   const visualReference = selectVisualReference(
     work.visualReferenceUrls,
@@ -980,7 +955,7 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
   } catch {
     if (requestId !== loadRequest) return;
     elements.subtitleStatus.textContent = '音轨不可用';
-    showToast(work.provider === 'asmr-one' ? '此音轨无法载入，可在“在线作品”中刷新目录后重试' : '此音轨无法载入');
+    showToast(isOnlineWork(work) ? '此音轨无法载入，可在“在线作品”中刷新目录后重试' : '此音轨无法载入');
   }
 }
 
@@ -1053,7 +1028,7 @@ async function applyLibrary(data, nextLocalLibrary = null, { remoteUpdate = fals
     elements.trackTitle.textContent = '添加在线作品，或打开本机曲库';
     elements.workTitle.textContent = 'ASMR 原声播放器';
     elements.subtitleStatus.textContent = '等待选择';
-    document.title = 'ASMR 原声播放器 · v0.0.6';
+    document.title = 'ASMR 原声播放器 · v0.0.7';
     renderLibrary();
     return;
   }
@@ -1070,7 +1045,62 @@ async function applyLibrary(data, nextLocalLibrary = null, { remoteUpdate = fals
   await selectTrack(workIndex, trackIndex, false);
 }
 
-async function importFolder(files, flat = false) {
+function setCacheStatus(message,error = false) {
+  elements.localCacheStatus.textContent=message;
+  elements.localCacheStatus.dataset.error=String(error);
+}
+
+async function saveLocalLibrary(next,directoryHandle) {
+  cacheSaveController?.abort();
+  const controller=new AbortController();cacheSaveController=controller;
+  const request=++cacheSaveRequest;
+  const summary={works:next.works.map(work=>({id:work.id,title:work.title,relativePath:work.relativePath,trackCount:work.tracks.length})),counts:{works:next.counts.works,tracks:next.counts.tracks}};
+  setCacheStatus(directoryHandle ? '正在记住曲库目录访问权限…' : '正在将曲库缓存到此浏览器，播放可继续…');
+  try {
+    const result=await localCache.save({files: next.cacheFiles,directoryHandle,summary},{signal:controller.signal,onProgress:progress=>{
+      if (request === cacheSaveRequest && !controller.signal.aborted) setCacheStatus(`正在保存本机缓存：${progress.completed ?? 0}/${progress.total ?? next.cacheFiles.length} 个文件，播放可继续…`);
+    }});
+    if (request !== cacheSaveRequest || controller.signal.aborted) return;
+    if (result.status === 'saved') setCacheStatus(result.mode === 'handle' ? '已记住曲库目录。下次在权限允许时自动恢复；文件留在设备内。' : '本机曲库已缓存到此浏览器，下次打开可自动恢复。清理浏览器存储会移除缓存。');
+    else setCacheStatus(`本次缓存未完成，当前仍可播放；上次完整缓存会保留。${result.reason || '浏览器存储暂不可用。'}`,true);
+  } catch {
+    if (request === cacheSaveRequest && !controller.signal.aborted) setCacheStatus('本次缓存未完成，当前仍可播放；上次完整缓存会保留。请检查浏览器存储空间与权限。',true);
+  }
+}
+
+async function restoreLocalLibrary(requestPermission = false,expectedImport = importRequest) {
+  if (expectedImport !== importRequest) return;
+  const request=++cacheRestoreRequest;
+  elements.restoreLibraryButton.disabled=true;
+  setCacheStatus('正在恢复本机曲库缓存…');
+  try {
+    const result=await localCache.restore({requestPermission});
+    if (request !== cacheRestoreRequest || expectedImport !== importRequest) return;
+    if (result.status === 'ready') {
+      const restored=await importFolder(result.files,false,{restored:true,isCurrent:()=>request === cacheRestoreRequest});
+      if (restored && request === cacheRestoreRequest) {
+        rememberedWorks=[];elements.restoreLibraryButton.hidden=true;
+        setCacheStatus(`已从此浏览器恢复 ${localLibrary.counts.works} 部作品、${localLibrary.counts.tracks} 个音轨；文件仍留在设备内。`);
+        renderLibrary();
+        return true;
+      }
+    } else if (result.status === 'permission-required') {
+      rememberedWorks=result.summary?.works ?? [];
+      elements.restoreLibraryButton.hidden=false;
+      setCacheStatus('已记住本机曲库。点击“恢复曲库访问”授权后即可播放，无需重新添加作品。');
+      elements.importStatus.textContent=`已记住 ${rememberedWorks.length} 部本机作品。打开左上角作品库，点击“恢复曲库访问”。`;
+      renderLibrary();
+    } else if (result.status === 'empty') {
+      setCacheStatus('本机缓存仅保存在此浏览器，不上传媒体。选择文件后自动保存可恢复的曲库。');
+    } else setCacheStatus(result.reason || '此浏览器暂时无法恢复本机缓存。仍可重新选择曲库播放。',true);
+  } catch {
+    if (request === cacheRestoreRequest) setCacheStatus('本机缓存暂时无法读取。仍可重新选择曲库播放；原完整缓存会保留。',true);
+  } finally {
+    if (request === cacheRestoreRequest) elements.restoreLibraryButton.disabled=false;
+  }
+}
+
+async function importFolder(files, flat = false, {directoryHandle,restored = false,isCurrent = ()=>true,cacheGeneration = cacheWriteGeneration} = {}) {
   if (files.length === 0) return;
   if (flat) {
     const names = new Set();
@@ -1079,7 +1109,9 @@ async function importFolder(files, flat = false) {
       return;
     }
   }
-  const requestId = ++importRequest;
+  const requestId = restored ? importRequest : ++importRequest;
+  const writeGeneration = cacheGeneration;
+  const isCurrentImport = () => requestId === importRequest && isCurrent();
   elements.openFolderButton.disabled = true;
   elements.chooseFolderButton.disabled = true;
   elements.openFilesButton.disabled = true;
@@ -1089,12 +1121,12 @@ async function importFolder(files, flat = false) {
   try {
     const next = await scanLocalFiles(files, {
       onProgress: (progress) => {
-        if (requestId === importRequest) {
+        if (isCurrentImport()) {
           elements.importStatus.textContent = `正在读取：${progress.works} 部作品，${progress.tracks} 个音轨`;
         }
       },
     });
-    if (requestId !== importRequest) { next.dispose(); return; }
+    if (!isCurrentImport()) { next.dispose(); return; }
     if (next.counts.tracks === 0) {
       next.dispose();
       elements.importStatus.textContent = '此文件夹没有 MP3 或 WAV。请选择曲库、分类或作品文件夹。';
@@ -1103,9 +1135,15 @@ async function importFolder(files, flat = false) {
     }
     setActiveDrawer(null);
     await applyLibrary(next, next);
+    // Media/subtitle preparation can finish after another import or a cache clear.
+    if (!isCurrentImport() || localLibrary !== next) return;
+    rememberedWorks=[];elements.restoreLibraryButton.hidden=true;
     elements.importStatus.textContent = `已读取 ${next.counts.works} 部作品、${next.counts.tracks} 个音轨，文件留在本机。`;
     showToast(`已读取 ${next.counts.works} 部作品 · ${next.counts.tracks} 个音轨`);
+    if (!restored && writeGeneration === cacheWriteGeneration) void saveLocalLibrary(next,directoryHandle);
+    return true;
   } catch {
+    if (!isCurrentImport()) return;
     elements.importStatus.textContent = '文件夹读取失败，请重新选择，并确认文件仍在原位置。';
     showToast('文件夹读取失败，请重新选择');
   } finally {
@@ -1121,22 +1159,62 @@ async function importFolder(files, flat = false) {
 
 async function initialize() {
   setLibraryAvailable(false);
+  const expectedImport=importRequest;
+  let initialData={works:[],categories:[],profiles:{}};
   try {
-    const data = await loadInitialLibrary({ mode: libraryMode, baseUrl: document.baseURI });
-    await applyLibrary(data);
+    initialData = await loadInitialLibrary({ mode: libraryMode, baseUrl: document.baseURI });
   } catch {
-    if (remoteLibrary.works().length) {
-      await applyLibrary({works:[],categories:[],profiles:{}});
-      return;
+    if (!remoteLibrary.works().length && expectedImport === importRequest) {
+      elements.trackTitle.textContent = '可直接选择本机曲库文件夹';
+      elements.subtitleStatus.textContent = '等待选择';
+      elements.importStatus.textContent = '本地服务暂不可用。也可以直接选择文件夹播放。';
     }
-    elements.trackTitle.textContent = '可直接选择本机曲库文件夹';
-    elements.subtitleStatus.textContent = '等待选择';
-    elements.importStatus.textContent = '本地服务暂不可用。也可以直接选择文件夹播放。';
+  }
+  // Select the remembered work only after the full local and online library is ready.
+  // An early online-only select would overwrite the saved local work ID.
+  const restored=await restoreLocalLibrary(false,expectedImport);
+  if (!restored && expectedImport === importRequest) await applyLibrary(initialData);
+}
+
+async function chooseDirectory() {
+  const pickerRequest=++directoryPickerRequest;
+  if (typeof window.showDirectoryPicker !== 'function') { elements.folderInput.click();return; }
+  const expectedImport=importRequest;
+  const isCurrentPicker=()=>pickerRequest === directoryPickerRequest && expectedImport === importRequest;
+  try {
+    // Invoke the picker before yielding, while this click still has user activation.
+    const handle=await window.showDirectoryPicker({id:'asmr-player-library',mode:'read'});
+    if (!isCurrentPicker()) return;
+    const writeGeneration=cacheWriteGeneration;
+    setCacheStatus('正在读取已选择的本机曲库…');
+    const files=await readDirectoryFiles(handle,{onProgress:progress=>{
+      if (isCurrentPicker() && writeGeneration === cacheWriteGeneration) setCacheStatus(`正在读取曲库文件：${progress.completed ?? progress.files ?? 0} 个…`);
+    }});
+    if (!isCurrentPicker()) return;
+    await importFolder(files,false,{directoryHandle:handle,cacheGeneration:writeGeneration});
+  } catch (error) {
+    if (!isCurrentPicker()) return;
+    if (error.name === 'AbortError') return;
+    setCacheStatus('此浏览器无法使用目录访问，可通过文件选择器读取和缓存曲库。',true);
+    elements.folderInput.click();
   }
 }
 
-elements.openFolderButton.addEventListener('click', () => elements.folderInput.click());
-elements.chooseFolderButton.addEventListener('click', () => elements.folderInput.click());
+elements.restoreLibraryButton.addEventListener('click',()=>restoreLocalLibrary(true));
+elements.clearLocalCacheButton.addEventListener('click',async()=>{
+  ++cacheWriteGeneration;++cacheSaveRequest;++cacheRestoreRequest;cacheSaveController?.abort();
+  elements.clearLocalCacheButton.disabled=true;
+  try {
+    const result=await localCache.clear();
+    if (result.status === 'cleared') {
+      rememberedWorks=[];elements.restoreLibraryButton.hidden=true;renderLibrary();
+      setCacheStatus('已清除本机缓存。当前打开的文件仍可播放；在线作品目录保留。下次可重新选择本机文件。');
+    } else setCacheStatus(result.reason || '本机缓存暂时无法清除，请重试。',true);
+  } catch {setCacheStatus('本机缓存暂时无法清除，请重试。',true);}
+  finally {elements.clearLocalCacheButton.disabled=false;}
+});
+elements.openFolderButton.addEventListener('click', chooseDirectory);
+elements.chooseFolderButton.addEventListener('click', chooseDirectory);
 elements.openFilesButton.addEventListener('click', () => elements.filesInput.click());
 elements.chooseFilesButton.addEventListener('click', () => elements.filesInput.click());
 elements.filesInput.addEventListener('change', () => {

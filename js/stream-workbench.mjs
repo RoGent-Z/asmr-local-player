@@ -1,7 +1,6 @@
-import { createRemoteDownloadSelection, selectRemoteEntries } from './stream-library.mjs';
+import { availableRemoteFormats, createRemoteDownloadSelection, selectRemoteEntries } from './stream-library.mjs';
 import { downloadRemoteWork } from './stream-download.mjs';
 
-const extension = path => /\.([^.\/]+)$/.exec(path)?.[1].toLowerCase();
 const bytesLabel = bytes => bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(2)} GB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 
 export function createStreamWorkbench({ registry, onChange, onReveal = () => {}, onOpenChange = () => {}, downloadWork = downloadRemoteWork }) {
@@ -56,13 +55,17 @@ export function createStreamWorkbench({ registry, onChange, onReveal = () => {},
     el.streamWork.replaceChildren();
     if (!works.length) { const option = document.createElement('option'); option.textContent = '尚未添加在线作品'; el.streamWork.append(option); }
     for (const work of works) {
-      const option = document.createElement('option'); option.value = work.id; option.textContent = `${work.code} · ${work.title}`;
+      const option = document.createElement('option'); option.value = work.id; option.textContent = work.code ? `${work.code} · ${work.title}` : work.title;
       option.title = work.title; option.selected = work.id === selectedId; el.streamWork.append(option);
     }
     const work = current();
-    el.streamFormat.value = work?.format ?? 'mp3';
-    for (const option of el.streamFormat.options) option.disabled = Boolean(work && option.value !== 'all'
-      && !work.rawEntries.some(e=>e.type === 'audio' && extension(e.path) === option.value));
+    el.streamFormat.replaceChildren();
+    for (const format of availableRemoteFormats(work?.rawEntries ?? [])) {
+      const option=document.createElement('option');option.value=format;
+      option.textContent=format === 'all' ? '全部音频格式' : format.toUpperCase();
+      option.selected=format === work?.format;el.streamFormat.append(option);
+    }
+    el.streamFormat.value = work?.format ?? 'all';
     const entries = work ? selectRemoteEntries(work.rawEntries,work.format) : [];
     const total = entries.reduce((sum,entry)=>sum + (entry.size || 0),0);
     el.streamDetails.textContent = work ? `${work.tracks.length} 条音轨 · ${entries.filter(e=>e.type === 'image').length} 张目录图片${total ? ` · 已知文件大小 ${bytesLabel(total)}` : ''}` : '添加后自动读取封面、图片和音轨目录。';
@@ -83,7 +86,7 @@ export function createStreamWorkbench({ registry, onChange, onReveal = () => {},
       if (request !== generation || signal.aborted) return;
       selectedId = work.id; await onChange(work); if (request !== generation) return;
       render(); el.streamProgress.value = 1;
-      status(registry.persistenceFailed() ? '已添加，可立即播放。浏览器未能保存目录，刷新后需重新添加。' : '已添加到在线作品库。可直接播放，刷新后保留目录与播放进度。');
+      status(registry.persistenceFailed() ? '已添加，可立即播放。浏览器未能保存目录，刷新后需重新添加。' : '已添加到作品库。可直接播放，刷新后保留目录与播放进度。');
     } catch (error) {
       if (request !== generation) return;
       el.streamProgress.value = 0;

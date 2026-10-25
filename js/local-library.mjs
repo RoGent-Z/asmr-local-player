@@ -42,7 +42,7 @@ function prepareFiles(files) {
   const unique = new Map();
   for (const file of files ?? []) {
     const path = normalizePath(file);
-    if (path && allowedPath(path) && !unique.has(path)) unique.set(path, { file, path });
+    if (path && allowedPath(path) && !unique.has(path)) unique.set(path, { file, path, cachePath: path });
   }
   const entries = [...unique.values()];
   const firstRoot = entries[0]?.path.split('/')[0];
@@ -154,6 +154,7 @@ export async function scanLocalFiles(files, {
   const works = [];
   const categories = [];
   const profiles = {};
+  const cacheFiles = [];
   let disposed = false;
   const dispose = () => {
     if (disposed) return;
@@ -249,7 +250,12 @@ export async function scanLocalFiles(files, {
     for (const entry of entries.filter(({ path }) => baseName(path) === profileFileName)
       .sort((left, right) => naturalCollator.compare(left.path, right.path))) {
       try {
-        Object.assign(profiles, sanitizeCloudProfiles(JSON.parse(await entry.file.text())));
+        const safeProfiles = sanitizeCloudProfiles(JSON.parse(await entry.file.text()));
+        Object.assign(profiles, safeProfiles);
+        if (Object.keys(safeProfiles).length) cacheFiles.push({ path: entry.cachePath,
+          file: new File([JSON.stringify({ version: 2, profiles: safeProfiles })], profileFileName,
+            { type: 'application/json', lastModified: entry.file.lastModified }),
+        });
       } catch { /* Optional structured cache cannot block local audio playback. */ }
     }
     for (const work of discoverWorks(entries, selectedRoot)) {
@@ -301,7 +307,10 @@ export async function scanLocalFiles(files, {
       report('scan');
     }
     report('complete');
-    return { works, categories, profiles, counts, dispose, getFile: (url) => filesByUrl.get(url) ?? null };
+    for (const entry of entries) {
+      if (resourceUrls.has(entry.path)) cacheFiles.push({ file: entry.file, path: entry.cachePath });
+    }
+    return { works, categories, profiles, counts, cacheFiles, dispose, getFile: (url) => filesByUrl.get(url) ?? null };
   } catch (error) {
     dispose();
     throw error;
