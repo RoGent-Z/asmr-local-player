@@ -96,10 +96,11 @@ try{
   assert.equal(stats.background.imageShown,true);assert.equal(stats.background.blur,'blur(14px)');
   const scene=await page.locator('#foliaSceneCanvas').evaluate(canvas=>{
     const bytes=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
-    let green=0;const colors=new Set();
-    for(let i=0;i<bytes.length;i+=4*113){const r=bytes[i],g=bytes[i+1],b=bytes[i+2];if(g>45&&g>r*1.15)green++;colors.add((r>>3)<<10|(g>>3)<<5|(b>>3));}
-    return {pixels:canvas.width*canvas.height,colors:colors.size,green};
+    let green=0;const colors=new Set(),rgba=new Set();
+    for(let i=0;i<bytes.length;i+=4*113){const r=bytes[i],g=bytes[i+1],b=bytes[i+2];if(g>45&&g>r*1.15)green++;colors.add((r>>3)<<10|(g>>3)<<5|(b>>3));rgba.add((r<<24|g<<16|b<<8|bytes[i+3])>>>0);}
+    return {pixels:canvas.width*canvas.height,colors:colors.size,rgba:rgba.size,green};
   });
+  stats.sceneDiagnostic=scene;
   assert.ok(scene.pixels<=2500000&&scene.colors>30);
   assert.equal(await page.locator('#audioLeft').evaluate(a=>a.src),asmrSrc);
   const cueTime=await page.locator('#audioLeft').evaluate(a=>a.currentTime);
