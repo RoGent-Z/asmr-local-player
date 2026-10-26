@@ -1,0 +1,29 @@
+name: Verify v008 public Folia playback
+on:
+  push:
+    branches: [qa/v008-folia]
+permissions:
+  contents: read
+jobs:
+  public-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Anonymous production audio and Folia subtitle check
+        env:
+          PLAYWRIGHT_MODULE: playwright
+          PYTHON_EXE: python3
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/v008-folia-probe"
+          cd "$RUNNER_TEMP/v008-folia-probe"
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund playwright@1.62.1
+          if command -v google-chrome > /dev/null; then
+            export BROWSER_CHANNEL=chrome
+          else
+            npx playwright install --with-deps chromium
+          fi
+          export V008_REPORT="$RUNNER_TEMP/v008-technical-summary.json"
+          curl --fail --silent --show-error https://raw.githubusercontent.com/RoGent-Z/asmr-local-player/qa/v008-folia/qa/verify-v008-live.mjs -o probe.mjs
+          node probe.mjs
