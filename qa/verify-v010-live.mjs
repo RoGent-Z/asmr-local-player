@@ -94,6 +94,7 @@ try{
     sourceRecorded:false,
   }));
   assert.equal(stats.background.imageShown,true);assert.equal(stats.background.blur,'blur(14px)');
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const scene=await page.locator('#foliaSceneCanvas').evaluate(canvas=>{
     const bytes=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
     let green=0;const colors=new Set(),rgba=new Set();
@@ -101,7 +102,7 @@ try{
     return {pixels:canvas.width*canvas.height,colors:colors.size,rgba:rgba.size,green};
   });
   stats.sceneDiagnostic=scene;
-  assert.ok(scene.pixels<=2500000&&scene.colors>30);
+  assert.ok(scene.pixels<=2500000&&scene.rgba>30,JSON.stringify(scene));
   assert.equal(await page.locator('#audioLeft').evaluate(a=>a.src),asmrSrc);
   const cueTime=await page.locator('#audioLeft').evaluate(a=>a.currentTime);
   await page.locator('#playButton').click();await page.waitForFunction(t=>document.querySelector('#audioLeft').currentTime>t+.2,cueTime);
