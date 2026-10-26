@@ -270,6 +270,7 @@ aiWorkbench = createAiWorkbench({
   onOpenChange: (open) => { if (open) { setActiveDrawer(null); window.clearTimeout(hideTimer); } showUi(); },
 });
 backgroundPicker = createBackgroundPicker({
+  onChange: (candidate) => { folia?.setBackground(candidate?.url ?? null); },
   onOpenChange: (open) => { if (open) setActiveDrawer(null); showUi(); },
   onError: showToast,
 });
@@ -898,7 +899,7 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
   elements.workTitle.textContent = work.title;
   elements.trackTitle.textContent = track.title;
   elements.subtitleStatus.textContent = '载入中';
-  document.title = `${track.title} · ASMR v0.0.9`;
+  document.title = `${track.title} · ASMR v0.0.10`;
   const semanticKey = trackProfileKey(work.id, track.id);
   const visualReference = selectVisualReference(
     work.visualReferenceUrls,
@@ -1044,7 +1045,7 @@ async function applyLibrary(data, nextLocalLibrary = null, { remoteUpdate = fals
     elements.trackTitle.textContent = '添加在线作品，或打开本机曲库';
     elements.workTitle.textContent = 'ASMR 原声播放器';
     elements.subtitleStatus.textContent = '等待选择';
-    document.title = 'ASMR 原声播放器 · v0.0.9';
+    document.title = 'ASMR 原声播放器 · v0.0.10';
     renderLibrary();
     return;
   }

@@ -1,6 +1,7 @@
 import {buildFoliaTimeline, foliaFrameAt} from './folia-timeline.mjs';
 import {createFoliaScene} from './folia-scene.mjs';
 import {segmentFoliaText,foliaGlyphFrame} from './folia-glyphs.mjs';
+import {createFoliaBackdrop,DEFAULT_FOLIA_PALETTE} from './folia-theme.mjs';
 
 const PREFERENCE_KEY='asmr-player:folia:v1';
 
@@ -19,6 +20,14 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
   const motion=matchMedia('(prefers-reduced-motion: reduce)');
   let preferred=false,ready=false,active=false,time=0,signature='',playing=false;
   let timeline=buildFoliaTimeline([]),activeNodes=[],measurement=0;
+  let palette=DEFAULT_FOLIA_PALETTE,hasBackground=false;
+  const backdrop=createFoliaBackdrop({onChange:state=>{
+    palette=state.palette;hasBackground=state.hasBackground;
+    app.classList.toggle('folia-image',hasBackground);app.dataset.foliaTheme=state.status;
+    for(const key of ['accent','light','echo','star','deep'])app.style.setProperty(`--folia-${key==='accent'?'tint':key}`,palette[key]);
+    palette.echo.split(',').map(Number).forEach((value,index)=>app.style.setProperty(`--folia-glyph-${['r','g','b'][index]}`,String(Math.round(value*.65+255*.25))));
+    if(active)update(time,{force:true});
+  }});
   try {preferred=storage?.getItem(PREFERENCE_KEY)==='true';} catch { /* Restricted storage: this visit still works. */ }
 
   function restoreFocus() {
@@ -105,7 +114,7 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
       line.style.setProperty('--entry-y',`${(1-light.entrance)*9}px`);
       for(let i=0;i<glyphs.length;i++)glyphs[i].style.setProperty('--glyph-light',String(light.weights[i]));
     });
-    const model=scene.render({time,...frame,playing,reducedMotion,playbackRate:Number(rateControl?.value)||1,force});
+    const model=scene.render({time,...frame,playing,reducedMotion,playbackRate:Number(rateControl?.value)||1,force,palette,hasBackground});
     stage.dataset.renderer=scene.available?'canvas':'css';
     stage.dataset.motion=reducedMotion?'reduced':'full';
     if(model){
@@ -129,7 +138,9 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
   const motionChanged=()=>{if(active)update(time);};
   motion.addEventListener('change',motionChanged);
   syncVisibility();
+  backdrop.setSource(doc.querySelector('#workBackground')?.getAttribute('src'));
   return {
+    setBackground:backdrop.setSource,
     setCues(cues){
       timeline=buildFoliaTimeline(cues);signature='';syncVisibility();
       if(!timeline.items.length){before.replaceChildren();current.replaceChildren();after.replaceChildren();activeNodes=[];gap.hidden=true;}
@@ -139,6 +150,6 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
     setPlaying(value){playing=Boolean(value);stage.dataset.playing=String(playing);if(active)update(time);},
     update,isActive:()=>active,
     disable({restoreFocus:restore=false}={}){changePreference(false,{restore});},
-    destroy(){observer.disconnect();cancelAnimationFrame(measurement);window.removeEventListener('resize',measure);motion.removeEventListener('change',motionChanged);scene.destroy();button.removeEventListener('click',toggle);exit.removeEventListener('click',close);settings.removeEventListener('click',toggleSettings);},
+    destroy(){backdrop.destroy();observer.disconnect();cancelAnimationFrame(measurement);window.removeEventListener('resize',measure);motion.removeEventListener('change',motionChanged);scene.destroy();button.removeEventListener('click',toggle);exit.removeEventListener('click',close);settings.removeEventListener('click',toggleSettings);},
   };
 }

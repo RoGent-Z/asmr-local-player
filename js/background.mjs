@@ -5,7 +5,7 @@ export function selectWorkBackground(candidates, savedPath) {
   return { image: candidates.length === 1 ? candidates[0] : null, needsChoice: candidates.length > 1 };
 }
 
-export function createBackgroundPicker({ onOpenChange = () => {}, onError = () => {} } = {}) {
+export function createBackgroundPicker({ onOpenChange = () => {}, onError = () => {}, onChange = () => {} } = {}) {
   const dialog = document.querySelector('#backgroundDialog');
   const gallery = document.querySelector('#backgroundGallery');
   const heading = document.querySelector('#backgroundWorkName');
@@ -22,6 +22,7 @@ export function createBackgroundPicker({ onOpenChange = () => {}, onError = () =
     app.classList.toggle('has-background', Boolean(candidate));
     if (candidate) image.src = candidate.url;
     else image.removeAttribute('src');
+    onChange(candidate ?? null);
   }
   function select(path) {
     if (!currentWork) return;

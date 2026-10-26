@@ -1184,12 +1184,15 @@ button:disabled:hover { transform: none; }
 
 /* Folia light scene: original Canvas field + accessible DOM typography. */
 .folia-toggle { min-height: 44px; }
-.folia-toggle span { margin-left: 4px; color: #bfe8d7; }
-.folia-toggle[aria-pressed="true"] { border-color: #b5e7d6; background: #254b438c; }
-.app.folia-active { overflow: clip; background: #05100f; min-height: 100dvh; height: 100dvh; }
+.folia-toggle span { margin-left: 4px; color: rgb(var(--folia-light,191,232,215)); }
+.folia-toggle[aria-pressed="true"] { border-color: rgb(var(--folia-light,181,231,214)); background: rgba(var(--folia-tint,37,75,67),.22); }
+.app.folia-active { --folia-tint: 68,214,173; --folia-light: 177,255,221; --folia-echo: 141,238,199; --folia-star: 216,255,232; --folia-deep: 2,24,22;
+  overflow: clip; background: #05100f; min-height: 100dvh; height: 100dvh; }
 .folia-active .subtitle-stage { visibility: hidden; }
 .folia-active .spectrum-canvas, .folia-active .voice-atmosphere, .folia-active .center-spectrum { visibility: hidden; }
-.folia-active .work-background { opacity: .04; }
+.folia-active.has-background .work-background { opacity: 1; inset: -32px; width: calc(100% + 64px); height: calc(100% + 64px); filter: blur(14px); }
+.folia-active.has-background .veil { background: linear-gradient(180deg,rgba(3,3,5,.46),rgba(3,3,5,.24) 42%,rgba(3,3,5,.6)); }
+.folia-active.folia-image .folia-scene { background: transparent; }
 .folia-scene { position: absolute; z-index: 4; inset: 0; width: 100%; height: 100%; pointer-events: none;
   background: radial-gradient(ellipse at 18% 12%, #64b29b45, transparent 56%), linear-gradient(125deg,#071617cc,#02070dee),
     repeating-conic-gradient(from 25deg,#b7eed820 0 25%,transparent 0 50%) 50% / 90px 90px, #071310; }
@@ -1198,10 +1201,10 @@ button:disabled:hover { transform: none; }
   grid-template-rows: 44px minmax(0,1fr); gap: 8px; padding: 0 12px 12px; overflow: hidden; isolation: isolate; perspective: 1000px; }
 .folia-heading { position: relative; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .folia-actions { display: flex; align-items: center; gap: 8px; }
-#foliaSettings { display: none; min-height: 44px; padding: 8px 12px; border-radius: 24px; background: #06140eb3; border-color: #c9efdd32; font-size: 11px; }
-.folia-wordmark { color: #d0eade; font-size: 10px; font-weight: 500; letter-spacing: .35em; }
-.folia-wordmark i { margin-left: 16px; font-size: 10px; font-style: normal; font-weight: 400; letter-spacing: .25em; color: #94b8ab; }
-#foliaExit { min-width: 76px; min-height: 44px; padding: 9px 16px; border-radius: 24px; border-color: #c9efdd32; background: #06140eb3; font-size: 12px; }
+#foliaSettings { display: none; min-height: 44px; padding: 8px 12px; border-radius: 24px; background: rgba(var(--folia-deep),.75); border-color: rgba(var(--folia-light),.2); font-size: 11px; }
+.folia-wordmark { color: rgb(var(--folia-light)); font-size: 10px; font-weight: 500; letter-spacing: .35em; }
+.folia-wordmark i { margin-left: 16px; font-size: 10px; font-style: normal; font-weight: 400; letter-spacing: .25em; color: rgba(var(--folia-light),.65); }
+#foliaExit { min-width: 76px; min-height: 44px; padding: 9px 16px; border-radius: 24px; border-color: rgba(var(--folia-light),.2); background: rgba(var(--folia-deep),.75); font-size: 12px; }
 #foliaExit span { margin-left: 12px; }
 .folia-reading { position: relative; grid-row: 2; min-height: 0; margin: 16px 13%; overflow: hidden; perspective: 1100px; }
 .folia-current { display: grid; align-content: safe center; align-items: center; gap: 26px; height: 100%; overflow-y: auto; overscroll-behavior: contain;
@@ -1211,24 +1214,23 @@ button:disabled:hover { transform: none; }
 .folia-line { position: relative; display: block; width: 100%; min-width: 0; min-height: 44px; border: 0; border-radius: 6px;
   padding: 16px 8px 22px; background: transparent; text-align: center; color: #f0fff7; cursor: pointer; transform: translateY(var(--entry-y,0px)); }
 .folia-line:hover { background: #d9f6e805; }
-.folia-line:focus-visible { outline: 2px solid #d4ffed; outline-offset: -2px; background: #07241acc; }
-.folia-voice { display: block; margin-bottom: 15px; font: 10px/1.5 system-ui,sans-serif; font-weight: 400; letter-spacing: .25em; color: #b9d7cb; }
-.folia-line[data-side="right"] .folia-voice { color: #c4d1e8; }
+.folia-line:focus-visible { outline: 2px solid rgb(var(--folia-light)); outline-offset: -2px; background: rgba(var(--folia-deep),.8); }
+.folia-voice { display: block; margin-bottom: 15px; font: 10px/1.5 system-ui,sans-serif; font-weight: 400; letter-spacing: .25em; color: rgba(var(--folia-light),.8); }
 .folia-line-text { display: block; white-space: pre-wrap; overflow-wrap: anywhere; font-family: "Yu Mincho","SimSun","Songti SC",serif;
   font-weight: 500; line-height: 1.65; letter-spacing: .055em; font-size: clamp(32px,4.4vw,68px); text-wrap: pretty;
-  text-shadow: 0 0 4px #ffffffa6,0 0 14px #a7efce73,0 0 30px #78c8ad36; }
+  color: rgb(var(--folia-light)); text-shadow: 0 0 4px #ffffffa6,0 0 14px rgba(var(--folia-tint),.45),0 0 30px rgba(var(--folia-tint),.21); }
 .folia-glyph { position: relative; --glyph-peak: clamp(0,calc((var(--glyph-light,.82) - .68) / .32),1);
-  color: rgb(calc(155 + var(--glyph-peak)*95) calc(193 + var(--glyph-peak)*62) calc(182 + var(--glyph-peak)*65));
+  color: rgb(calc(var(--folia-glyph-r,155) + (250 - var(--folia-glyph-r,155))*var(--glyph-peak)) calc(var(--folia-glyph-g,193) + (255 - var(--folia-glyph-g,193))*var(--glyph-peak)) calc(var(--folia-glyph-b,182) + (247 - var(--folia-glyph-b,182))*var(--glyph-peak)));
   text-shadow: 0 0 calc(1px + var(--glyph-peak)*5px) rgba(255,255,249,calc(.15 + var(--glyph-peak)*.75)),
-    0 0 calc(3px + var(--glyph-peak)*20px) rgba(162,242,210,calc(.08 + var(--glyph-peak)*.7)),0 0 34px rgba(153,230,206,calc(var(--glyph-peak)*.3)); }
-.folia-glyph::after { content: ''; position: absolute; left: 40%; top: .04em; width: .3em; height: .3em; background: #f0fff6;
-  clip-path: polygon(50% 0,57% 43%,100% 50%,57% 57%,50% 100%,43% 57%,0 50%,43% 43%); filter: drop-shadow(0 0 5px #c4ffe7);
+    0 0 calc(3px + var(--glyph-peak)*20px) rgba(var(--folia-tint),calc(.08 + var(--glyph-peak)*.7)),0 0 34px rgba(var(--folia-tint),calc(var(--glyph-peak)*.3)); }
+.folia-glyph::after { content: ''; position: absolute; left: 40%; top: .04em; width: .3em; height: .3em; background: rgb(var(--folia-star));
+  clip-path: polygon(50% 0,57% 43%,100% 50%,57% 57%,50% 100%,43% 57%,0 50%,43% 43%); filter: drop-shadow(0 0 5px rgb(var(--folia-light)));
   opacity: clamp(0,calc((var(--glyph-peak) - .86)*7),1); pointer-events: none; }
 .folia-glyph[data-blank="true"]::after { display: none; }
 .folia-stage[data-duet="true"] .folia-current .folia-line-text { font-size: clamp(27px,3vw,46px); }
 .folia-current .folia-line[data-density="long"] .folia-line-text { font-size: clamp(22px,2.3vw,33px); line-height: 1.6; }
 .folia-line-progress { display: block; width: var(--line-progress,0%); max-width: 100%; height: 1px; margin: 20px auto 0;
-  background: linear-gradient(90deg,transparent,#d7f7e9,transparent); opacity: .38; }
+  background: linear-gradient(90deg,transparent,rgb(var(--folia-light)),transparent); opacity: .38; }
 .folia-context { position: absolute; z-index: 1; width: 92px; max-height: 32%; overflow: hidden; }
 .folia-context:empty { visibility: hidden; }
 .folia-before { left: 2%; top: 17%; transform: rotate(-4deg); }
@@ -1238,9 +1240,9 @@ button:disabled:hover { transform: none; }
 .folia-context .folia-line:hover, .folia-context .folia-line:focus-visible { opacity: 1; }
 .folia-context .folia-voice, .folia-context .folia-line-progress { display: none; }
 .folia-context .folia-line-text { writing-mode: vertical-rl; text-orientation: mixed; max-height: 180px; margin: 0 auto; font-size: 24px; line-height: 1.8;
-  letter-spacing: .1em; overflow: hidden; text-shadow: 0 0 6px #e5ffef80,0 0 14px #a4ebd14d; }
-.folia-gap { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; color: #accabe; text-shadow: 0 0 12px #a8e6c573; }
-.folia-gap b { color: #d7ffec; font-size: 40px; letter-spacing: .2em; font-weight: 400; }
+  letter-spacing: .1em; overflow: hidden; text-shadow: 0 0 6px rgba(var(--folia-light),.5),0 0 14px rgba(var(--folia-tint),.3); }
+.folia-gap { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; color: rgb(var(--folia-echo)); text-shadow: 0 0 12px rgba(var(--folia-tint),.45); }
+.folia-gap b { color: rgb(var(--folia-light)); font-size: 40px; letter-spacing: .2em; font-weight: 400; }
 .folia-gap span { margin-top: 12px; font-size: 12px; letter-spacing: .18em; }
 @media (max-width: 600px) {
   #foliaSettings { display: block; }

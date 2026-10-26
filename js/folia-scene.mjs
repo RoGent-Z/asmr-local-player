@@ -31,15 +31,20 @@ function drawScene(context, frame, width, height, ratioX, ratioY) {
   context.clearRect(0, 0, width, height);
   context.globalAlpha = 1;
   context.globalCompositeOperation = 'source-over';
+  if(frame.hasBackground){
+    context.fillStyle='rgba(0, 0, 0, 0.18)';
+    context.fillRect(0,0,width,height);
+  }else{
   const background = context.createLinearGradient(0, 0, width * 0.8, height);
   background.addColorStop(0, rgb(palette.deep));
   background.addColorStop(0.62, rgb(palette.background));
   background.addColorStop(1, 'rgb(1, 11, 13)');
   context.fillStyle = background;
   context.fillRect(0, 0, width, height);
+  }
 
   const haze = context.createRadialGradient(width * 0.24, height * 0.16, 0, width * 0.32, height * 0.28, Math.hypot(width, height) * 0.72);
-  haze.addColorStop(0, rgb(palette.accent, 0.21));
+  haze.addColorStop(0, rgb(palette.accent, frame.hasBackground ? 0.12 : 0.21));
   haze.addColorStop(0.38, rgb(palette.accent, 0.06));
   haze.addColorStop(1, rgb(palette.accent, 0));
   context.fillStyle = haze;
@@ -53,7 +58,7 @@ function drawScene(context, frame, width, height, ratioX, ratioY) {
 
   for (const tile of frame.grid) {
     polygon(context, tile.points);
-    context.fillStyle = rgb(palette.grid, tile.alpha);
+    context.fillStyle = rgb(palette.grid, tile.alpha * (frame.hasBackground ? 0.5 : 1));
     context.fill();
     context.strokeStyle = rgb(palette.light, tile.alpha * 0.32);
     context.lineWidth = 0.65;
@@ -191,6 +196,8 @@ export function createFoliaScene({ canvas, getPixelRatio = () => 1 } = {}) {
         const current = {
           time: Number.isFinite(input?.time) && input.time >= 0 ? input.time : 0,
           reducedMotion: input?.reducedMotion === true,
+          palette: input?.palette,
+          hasBackground: input?.hasBackground === true,
           playbackRate: Number.isFinite(input?.playbackRate) && input.playbackRate > 0 ? input.playbackRate : 1,
           active: cueRefs(input?.active, 3),
           before: cueRefs(input?.before, 2),
@@ -203,6 +210,7 @@ export function createFoliaScene({ canvas, getPixelRatio = () => 1 } = {}) {
         if (input?.playing === true && input?.force !== true && lastFrame && delta >= 0 && delta < current.playbackRate / 30
           && current.playbackRate === lastInput.playbackRate
           && current.reducedMotion === lastInput.reducedMotion
+          && current.palette === lastInput.palette && current.hasBackground === lastInput.hasBackground
           && sameRefs(current.active, lastInput.active)
           && sameRefs(current.before, lastInput.before)
           && sameRefs(current.after, lastInput.after)) return lastFrame;

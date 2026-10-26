@@ -1,14 +1,5 @@
 // Independent, media-time-only geometry. No wall clock, random state, or cue cache.
-const PALETTE = Object.freeze({
-  background: '2, 15, 15',
-  deep: '2, 24, 22',
-  accent: '68, 214, 173',
-  light: '177, 255, 221',
-  grid: '91, 220, 173',
-  dust: '193, 251, 218',
-  echo: '141, 238, 199',
-  star: '216, 255, 232',
-});
+import { normalizeFoliaPalette } from './folia-theme.mjs';
 const DEG = Math.PI / 180;
 const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
 const unit = (value) => value - Math.floor(value);
@@ -171,7 +162,8 @@ export function buildFoliaSceneFrame(options = {}) {
   }));
   return {
     camera,
-    palette: PALETTE,
+    palette: normalizeFoliaPalette(options?.palette),
+    hasBackground: options?.hasBackground === true,
     grid: makeGrid(width, height, motionTime),
     shafts,
     motes,
