@@ -7,9 +7,9 @@
   <meta name="library-source" content="local-files">
   <meta name="stream-resolver" content="https://asmr-player-resolver.navyelf7.chatgpt.site">
   <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://asmr-player-resolver.navyelf7.chatgpt.site https://kiko-play-niptan.one https://*.kiko-play-niptan.one; media-src 'self' blob: https://asmr-player-resolver.navyelf7.chatgpt.site https://kiko-play-niptan.one https://*.kiko-play-niptan.one; connect-src 'self' blob: https:; object-src 'none'; base-uri 'none'; form-action 'none'">
-  <meta name="app-version" content="0.0.10">
-  <title>ASMR 原声播放器 · v0.0.10</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://asmr-player-resolver.navyelf7.chatgpt.site https://kiko-play-niptan.one https://*.kiko-play-niptan.one; media-src 'self' blob: https://asmr-player-resolver.navyelf7.chatgpt.site https://kiko-play-niptan.one https://*.kiko-play-niptan.one; connect-src 'self' blob: https:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="app-version" content="0.0.11">
+  <title>ASMR 原声播放器 · v0.0.11</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -36,7 +36,8 @@
         <button id="openFolderButton" class="text-button" type="button">打开文件夹</button>
         <button id="openFilesButton" class="text-button" type="button">选择文件</button>
         <button id="foliaButton" class="text-button folia-toggle" type="button" aria-pressed="false" aria-controls="foliaStage">Folia <span aria-hidden="true">✦</span></button>
-        <button id="aiButton" class="text-button ai-entry" type="button" aria-haspopup="dialog">AI 字幕 <span class="version-tag">v0.0.10</span></button>
+        <button id="localTranslateButton" class="text-button local-entry" type="button" aria-haspopup="dialog">本地日语</button>
+        <button id="aiButton" class="text-button ai-entry" type="button" aria-haspopup="dialog">AI 字幕 <span class="version-tag">v0.0.11</span></button>
         <button id="backgroundButton" class="text-button" type="button" aria-haspopup="dialog" disabled>作品背景</button>
         <button id="dialogueButton" class="text-button" type="button"
           aria-label="打开全部台词" aria-expanded="false">台词</button>
@@ -146,8 +147,36 @@
     <audio id="audioRight" preload="metadata"></audio>
   </main>
 
+  <dialog id="localDialog" class="ai-dialog local-dialog" aria-labelledby="localHeading" data-state="idle">
+    <div class="ai-heading local-heading"><div><div class="eyebrow">ON YOUR DEVICE · DICTIONARY TRANSLATION</div><h2 id="localHeading">本地日语翻译 <small>实验版</small></h2></div><button id="localClose" class="icon-button" type="button" aria-label="关闭本地日语翻译">×</button></div>
+    <p class="local-intro">把日语音声变成字幕，再用网站自带词库匹配中文。<br>听写在本机运行，翻译只用词库和规则，无需账号或 API Key。</p>
+    <details id="localResourcesPanel" class="local-resources-panel" open><summary>本地语言库 <span id="localResourcesSummary">首次下载约 82 MB</span></summary><div class="local-resources" aria-label="本地语言库状态">
+      <div><span class="eyebrow">日中词库</span><p id="localDictionaryStatus">217,538 条词条 · 尚未准备</p><small>首次下载约 28 MB，之后优先读取本机缓存</small></div>
+      <div><span class="eyebrow">日语听写</span><p id="localAsrStatus">本机语音识别 · 尚未加载</p><small>首次下载约 54 MB，运行需要较多可用内存</small></div>
+    </div></details>
+    <p class="field-help">音频不上传。初次准备需要网络；浏览器清理数据后需重新准备。低内存设备可先选择“只翻译已有字幕”。</p>
+    <div class="local-setup-actions"><button id="localPrepare" class="text-button" type="button">准备本地语言库</button><button id="localClearCache" class="text-button" type="button">清除语言缓存</button><a class="field-help" href="./third-party/LOCAL-LANGUAGE-NOTICES.txt" target="_blank" rel="noopener">词库来源与许可 ↗</a></div>
+    <form id="localForm">
+      <p id="localTrackName" class="ai-track-info">先打开一个音轨</p>
+      <div class="local-options">
+        <label>处理方式<select id="localTaskMode"><option value="audio">识别音频并词库翻译</option><option value="subtitles">只翻译已有字幕</option></select></label>
+        <label>音源<select id="localSource"><option value="all">当前音轨</option></select></label>
+      </div>
+      <div class="local-run-actions"><button id="localStart" class="primary-button" type="submit">开始本地翻译</button><button id="localCancel" class="text-button" type="button" disabled>取消任务</button></div>
+      <progress id="localProgress" class="local-progress" max="1" value="0" aria-label="本地翻译进度"></progress>
+      <p id="localStatus" class="ai-status" role="status">语言库按需加载。译文是词库拼接结果，语序、多义词和耳语识别可能有误，仅供参考。</p>
+    </form>
+    <section class="local-results" aria-label="本地翻译结果">
+      <div class="local-result-heading"><h3>字幕结果</h3><label>显示<select id="localDisplayMode"><option value="bilingual">原文与中文</option><option value="original">日文原文</option><option value="translated">中文参考</option></select></label></div>
+      <p id="localCoverage" class="field-help">尚未生成结果。完成后可直接显示在播放器中，也可导出。</p>
+      <div id="localPreview" class="local-preview"></div>
+      <div class="local-result-actions"><button id="localApply" class="text-button" type="button" disabled>应用到播放器</button><button id="localRestore" class="text-button" type="button">还原曲库字幕</button><button id="localExportVtt" class="text-button" type="button" disabled>导出 VTT</button><button id="localExportSrt" class="text-button" type="button" disabled>导出 SRT</button><button id="localExportJson" class="text-button" type="button" disabled>导出 JSON</button></div>
+      <p class="field-help">结果保留在当前页面，可导出保存。多音源的 VTT／SRT 分别导出，JSON 保存全部来源。</p>
+    </section>
+  </dialog>
+
   <dialog id="aiDialog" class="ai-dialog" aria-labelledby="aiHeading">
-    <div class="ai-heading"><div><div class="eyebrow">LISTEN · TRANSCRIBE · TRANSLATE</div><h2 id="aiHeading">AI 字幕工作台 <small>v0.0.10</small></h2></div><button id="aiClose" class="icon-button" type="button" aria-label="关闭 AI 字幕">×</button></div>
+    <div class="ai-heading"><div><div class="eyebrow">LISTEN · TRANSCRIBE · TRANSLATE</div><h2 id="aiHeading">AI 字幕工作台 <small>v0.0.11</small></h2></div><button id="aiClose" class="icon-button" type="button" aria-label="关闭 AI 字幕">×</button></div>
     <p id="aiTrackInfo" class="ai-track-info">先选择一条音轨</p>
     <form id="aiForm" autocomplete="off">
       <fieldset class="ai-task-settings"><legend>处理当前音轨</legend>
@@ -219,7 +248,7 @@
     </div>
   </dialog>
   <dialog id="streamDialog" class="stream-dialog" aria-labelledby="streamHeading">
-    <div class="ai-heading"><div><div class="eyebrow">ONE LINK · PRESS PLAY</div><h2 id="streamHeading">在线作品 <small>v0.0.10</small></h2></div><button id="streamClose" class="icon-button" type="button" aria-label="关闭在线作品">×</button></div>
+    <div class="ai-heading"><div><div class="eyebrow">ONE LINK · PRESS PLAY</div><h2 id="streamHeading">在线作品 <small>v0.0.11</small></h2></div><button id="streamClose" class="icon-button" type="button" aria-label="关闭在线作品">×</button></div>
     <p class="stream-intro">输入公开网页、音频直链或播放列表网址，自动整理作品与音轨。</p>
     <form id="streamForm" class="stream-form">
       <label for="streamUrl">作品网址</label>

@@ -1,0 +1,43 @@
+本地日语听写与词库翻译 / Local Japanese speech and dictionary translation
+
+Runtime translation is dictionary lookup plus explicit rules. No neural machine
+translation / LLM translation / paid API is used. Speech-to-text alone uses a
+local Vosk acoustic/language model, with the user's explicit authorization.
+
+1. Vosk-Browser 0.0.8
+   Copyright 2020-2022 Ciaran O'Reilly; WASM bindings by Denis Treskunov;
+   Vosk API by Alpha Cephei Inc. Apache License 2.0.
+   https://github.com/ccoreilly/vosk-browser
+   Pinned commit: 4b8eb257503108d96819854d3984372903c2259e
+   Full license and dependency notices: VOSK-LICENSE.txt, VOSK-NOTICE.txt.
+   Modification: the embedded Base64 worker is extracted byte-for-byte as a
+   separate same-origin file; the main factory points to that file. This avoids
+   enabling JavaScript unsafe-eval in the main page. Recognition weights unchanged.
+
+2. vosk-model-small-ja-0.22
+   Alpha Cephei Inc. Apache License 2.0.
+   https://alphacephei.com/vosk/models
+   Original: https://alphacephei.com/vosk/models/vosk-model-small-ja-0.22.zip
+   Modification: deterministic tar.gz packaging only, all model files unchanged.
+
+3. Japanese-Chinese dictionary data: CC BY-SA 4.0
+   JMdict © Electronic Dictionary Research and Development Group (EDRDG).
+   Used in conformance with https://www.edrdg.org/edrdg/licence.html
+   https://www.edrdg.org/
+   Chinese derived glosses © Y1Z, Tomoshi, same CC BY-SA 4.0 license.
+   https://github.com/tomoshi-app/tomoshi-dict-data
+   Release v2026-10-13, commit 79621e4758f9da9b696d0a9f5f3dd3baad1d9ffa.
+   Upstream's Chinese gloss layer includes pre-generated, model-reviewed text.
+   Our website performs lookup of that published data; it does not run those
+   translation models. Brand names/logos are not licensed or used as endorsement.
+   Modifications: entries/forms/zh_defs/freq_rank only; retain written/read forms,
+   first available Chinese gloss, first POS and priority as compact JSON shards;
+   omit examples and unrelated tables. This derived dictionary is distributed
+   under CC BY-SA 4.0: https://creativecommons.org/licenses/by-sa/4.0/
+   Upstream attribution/license: JAPANESE-DICTIONARY-NOTICE.txt and
+   JAPANESE-DICTIONARY-LICENSE.txt. Exact hashes are in language/v1/manifest.json.
+
+The website's rule engine is separately implemented. Dictionary glosses, word
+order and speech recognition can be wrong; these are rough reference captions.
+All language assets come from this website, then use browser-local storage.
+No local audio or recognition text is uploaded by this translation feature.

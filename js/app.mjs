@@ -4,6 +4,7 @@ import { createAiWorkbench } from './ai-workbench.mjs';
 import { createBackgroundPicker } from './background.mjs';
 import { createCoverPicker } from './cover-picker.mjs';
 import { createFoliaView } from './folia-view.mjs';
+import { createLocalWorkbench } from './local-workbench.mjs';
 import { displaySourceCues } from './transcript.mjs';
 import {
   activeDialogueIds,
@@ -127,6 +128,8 @@ let backgroundPicker = null;
 let coverPicker = null;
 let streamWorkbench = null;
 let folia = null;
+let localWorkbench = null;
+let subtitleMethod = 'ai';
 const libraryMode = document.querySelector('meta[name="library-source"]')?.content ?? 'local-files';
 let activeDialogueItemIds = new Set();
 const dialogueNodes = new Map();
@@ -236,7 +239,7 @@ function refreshTrackCues() {
   if (!preparedTrack) return;
   if (aiDocument) {
     cues = aiPresentationCues(aiDocument, aiDisplayMode);
-    elements.subtitleStatus.textContent = cues.length ? 'AI 字幕已应用' : 'AI 处理中';
+    elements.subtitleStatus.textContent = subtitleMethod === 'local' ? (cues.length ? '本地词库字幕已应用' : '本地处理中') : (cues.length ? 'AI 字幕已应用' : 'AI 处理中');
   } else {
     cues = preparedTrack.cues;
     elements.subtitleStatus.textContent = cues.length
@@ -265,7 +268,7 @@ function configureListening() {
 
 aiWorkbench = createAiWorkbench({
   getContext: getAiContext,
-  onApply: (doc, mode) => { aiDocument = doc; aiDisplayMode = mode; refreshTrackCues(); },
+  onApply: (doc, mode) => { subtitleMethod = 'ai'; aiDocument = doc; aiDisplayMode = mode; refreshTrackCues(); },
   onRestore: () => { aiDocument = null; refreshTrackCues(); },
   onOpenChange: (open) => { if (open) { setActiveDrawer(null); window.clearTimeout(hideTimer); } showUi(); },
 });
@@ -273,6 +276,12 @@ backgroundPicker = createBackgroundPicker({
   onChange: (candidate) => { folia?.setBackground(candidate?.url ?? null); },
   onOpenChange: (open) => { if (open) setActiveDrawer(null); showUi(); },
   onError: showToast,
+});
+localWorkbench = createLocalWorkbench({
+  getContext: getAiContext,
+  onApply: (doc, mode) => { subtitleMethod = 'local'; aiDocument = doc; aiDisplayMode = mode; refreshTrackCues(); },
+  onRestore: () => { aiDocument = null; refreshTrackCues(); },
+  onOpenChange: (open) => { if (open) { setActiveDrawer(null); setActionsOpen(false); window.clearTimeout(hideTimer); } showUi(); },
 });
 coverPicker = createCoverPicker({
   onChange: () => renderLibrary(),
@@ -338,7 +347,7 @@ function setActiveDrawer(nextDrawer) {
 
 function scheduleHide() {
   window.clearTimeout(hideTimer);
-  if (!player.paused() && activeDrawer === null && !aiWorkbench?.isOpen()
+  if (!player.paused() && activeDrawer === null && !aiWorkbench?.isOpen() && !localWorkbench?.isOpen()
     && !elements.app.classList.contains('folia-settings-open')
     && !backgroundPicker?.isOpen() && !coverPicker?.isOpen() && !streamWorkbench?.isOpen() && !matchMedia('(pointer: coarse)').matches) {
     hideTimer = window.setTimeout(() => {
@@ -873,6 +882,7 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
   elements.progress.disabled = true;
   preparedTrack = null; aiDocument = null;
   aiWorkbench?.trackChanged();
+  localWorkbench?.trackChanged();
   spectrum.reset();
   const graphPromise = autoplay
     ? spectrum.ensureAudioGraph()
@@ -899,7 +909,7 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
   elements.workTitle.textContent = work.title;
   elements.trackTitle.textContent = track.title;
   elements.subtitleStatus.textContent = '载入中';
-  document.title = `${track.title} · ASMR v0.0.10`;
+  document.title = `${track.title} · ASMR v0.0.11`;
   const semanticKey = trackProfileKey(work.id, track.id);
   const visualReference = selectVisualReference(
     work.visualReferenceUrls,
@@ -961,6 +971,7 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
     }));
     refreshTrackCues();
     aiWorkbench.trackChanged();
+    localWorkbench?.trackChanged();
     renderActiveSubtitles(player.currentTime());
     updateActiveDialogue(player.currentTime(), activeDrawer === 'dialogue');
     if (autoplay) {
@@ -1022,6 +1033,7 @@ async function applyLibrary(data, nextLocalLibrary = null, { remoteUpdate = fals
   folia?.setCues([]);
   preparedTrack = null; aiDocument = null;
   aiWorkbench?.trackChanged();
+  localWorkbench?.trackChanged();
   player.load({ nextAlignment: null });
   ++loadRequest;
   spectrum.reset();
@@ -1045,7 +1057,7 @@ async function applyLibrary(data, nextLocalLibrary = null, { remoteUpdate = fals
     elements.trackTitle.textContent = '添加在线作品，或打开本机曲库';
     elements.workTitle.textContent = 'ASMR 原声播放器';
     elements.subtitleStatus.textContent = '等待选择';
-    document.title = 'ASMR 原声播放器 · v0.0.10';
+    document.title = 'ASMR 原声播放器 · v0.0.11';
     renderLibrary();
     return;
   }
@@ -1345,7 +1357,7 @@ document.addEventListener('keydown', (event) => {
     event.preventDefault();folia.disable({restoreFocus:true});return;
   }
   const tagName = event.target?.tagName;
-  if (['INPUT', 'SELECT', 'BUTTON', 'TEXTAREA'].includes(tagName) || aiWorkbench?.isOpen() || backgroundPicker?.isOpen() || coverPicker?.isOpen() || streamWorkbench?.isOpen()) return;
+  if (['INPUT', 'SELECT', 'BUTTON', 'TEXTAREA'].includes(tagName) || aiWorkbench?.isOpen() || localWorkbench?.isOpen() || backgroundPicker?.isOpen() || coverPicker?.isOpen() || streamWorkbench?.isOpen()) return;
   if (event.code === 'Space') {
     event.preventDefault();
     if (player.paused()) playAudio();
@@ -1360,6 +1372,7 @@ document.addEventListener('keydown', (event) => {
 });
 window.addEventListener('pagehide', (event) => {
   aiWorkbench?.clearKeys();
+  localWorkbench?.cancel({message:false});
   streamWorkbench?.cancel();
   persistCurrent();
   player.pause();
@@ -1367,6 +1380,7 @@ window.addEventListener('pagehide', (event) => {
   player.destroy();
   spectrum.destroy();
   folia?.destroy();
+  localWorkbench?.destroy();
   localLibrary?.dispose();
 });
 

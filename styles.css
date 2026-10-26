@@ -1182,6 +1182,59 @@ button:disabled:hover { transform: none; }
   .choose-stream-button { max-width: 100%; font-size: 13px; }
 }
 
+/* Local Japanese translation: the same quiet controls, with explicit local data. */
+.local-entry { border-color: #b1c7bb66; }
+.local-dialog { width: min(900px,calc(100vw - 28px)); padding: 0; overflow: hidden; }
+.local-dialog[open] { display: flex; flex-direction: column; max-height: calc(100dvh - 24px); }
+.local-heading { flex: 0 0 auto; margin: 0; padding: 24px 28px 18px; border-bottom: 1px solid var(--border-soft); }
+.local-heading h2 { margin-bottom: 0; }
+.local-dialog { overflow-y: auto; }
+.local-dialog .local-heading { position: sticky; top: 0; z-index: 2; background: #151219f5; backdrop-filter: blur(12px); }
+.local-dialog > :not(.local-heading) { margin-left: 28px; margin-right: 28px; }
+.local-intro { font-size: 14px; line-height: 1.9; color: #dfd7df; margin-top: 20px; }
+.local-resources-panel { border: 1px solid #d4ded022; border-radius: 12px; overflow: hidden; }
+.local-resources-panel > summary { display: list-item; min-height: 44px; padding: 12px 16px; cursor: pointer; font-size: 13px; }
+.local-resources-panel > summary span { float: right; color: #b4c7bd; font-size: 11px; line-height: 20px; }
+.local-resources-panel .local-resources { padding: 0 12px 12px; }
+.local-resources { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.local-resources > div { min-width: 0; padding: 18px; border: 1px solid #d4ded022; border-radius: 12px; background: #c1d9cb06; }
+.local-resources .eyebrow { color: #b4c7bd; font-size: 10px; letter-spacing: .12em; }
+.local-resources p { margin: 10px 0 7px; font-size: 14px; line-height: 1.6; }
+.local-resources small { display: block; color: var(--text-muted); font-size: 11px; line-height: 1.7; }
+.local-setup-actions,.local-run-actions,.local-result-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.local-setup-actions a { margin-left: auto; }
+.local-dialog #localForm { border-top: 1px solid var(--border-soft); padding-top: 20px; margin-top: 20px; }
+.local-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+.local-run-actions { margin: 18px 0 14px; }
+.local-run-actions .primary-button { min-height: 44px; border: 1px solid #b6c9c1; border-radius: 10px; padding: 10px 20px; color: #10241d; background: #d3e3dc; cursor: pointer; }
+.local-run-actions .primary-button:hover { background: #e5f1ec; }
+.local-run-actions .primary-button:disabled { opacity: .45; cursor: default; }
+.local-progress { display: block; width: 100%; height: 5px; accent-color: #c9e0d4; }
+.local-dialog .is-error { color: #ffb3c1; }
+.local-results { border-top: 1px solid var(--border-soft); padding: 18px 0 24px; }
+.local-result-heading { display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+.local-result-heading h3 { font-size: 16px; font-weight: 500; }
+.local-result-heading label { display: flex; flex-direction: row; align-items: center; gap: 12px; }
+.local-result-heading select { width: auto; }
+.local-preview { max-height: 280px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.local-cue { border-top: 1px solid #ffffff12; padding: 13px 0; }
+.local-cue-time { font-size: 10px; color: #9aada2; font-variant-numeric: tabular-nums; }
+.local-cue p { margin: 7px 0; font-size: 13px; line-height: 1.8; overflow-wrap: anywhere; white-space: pre-wrap; }
+.local-chinese { color: #d4e4da; }.local-original { color: #bcb0c1; }
+.local-result-actions { margin-top: 14px; }
+@media(max-width:600px){
+  .local-dialog { width: calc(100vw - 16px); max-width: calc(100vw - 16px); }
+  .local-dialog > :not(.local-heading) { margin-left: 16px; margin-right: 16px; }
+  .local-heading { padding: 18px 16px 14px; }
+  .local-heading h2 { font-size: 20px; }.local-heading .eyebrow { font-size: 8px; letter-spacing: .08em; }
+  .local-resources,.local-options { grid-template-columns: 1fr; gap: 10px; }
+  .local-resources > div { padding: 13px 15px; }
+  .local-resources-panel > summary span { float: none; display: block; padding-left: 14px; }
+  .local-setup-actions a { margin-left: 0; width: 100%; }
+  .local-result-heading { flex-wrap: wrap; gap: 4px; }.local-result-heading label { width: 100%; }
+  .local-result-actions { display: grid; grid-template-columns: 1fr 1fr; }
+}
+
 /* Folia light scene: original Canvas field + accessible DOM typography. */
 .folia-toggle { min-height: 44px; }
 .folia-toggle span { margin-left: 4px; color: rgb(var(--folia-light,191,232,215)); }
