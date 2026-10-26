@@ -8,8 +8,8 @@
   <meta name="stream-resolver" content="https://asmr-player-resolver.navyelf7.chatgpt.site">
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://asmr-player-resolver.navyelf7.chatgpt.site https://kiko-play-niptan.one https://*.kiko-play-niptan.one; media-src 'self' blob: https://asmr-player-resolver.navyelf7.chatgpt.site https://kiko-play-niptan.one https://*.kiko-play-niptan.one; connect-src 'self' blob: https:; object-src 'none'; base-uri 'none'; form-action 'none'">
-  <meta name="app-version" content="0.0.8">
-  <title>ASMR 原声播放器 · v0.0.8</title>
+  <meta name="app-version" content="0.0.9">
+  <title>ASMR 原声播放器 · v0.0.9</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -36,7 +36,7 @@
         <button id="openFolderButton" class="text-button" type="button">打开文件夹</button>
         <button id="openFilesButton" class="text-button" type="button">选择文件</button>
         <button id="foliaButton" class="text-button folia-toggle" type="button" aria-pressed="false" aria-controls="foliaStage">Folia <span aria-hidden="true">✦</span></button>
-        <button id="aiButton" class="text-button ai-entry" type="button" aria-haspopup="dialog">AI 字幕 <span class="version-tag">v0.0.8</span></button>
+        <button id="aiButton" class="text-button ai-entry" type="button" aria-haspopup="dialog">AI 字幕 <span class="version-tag">v0.0.9</span></button>
         <button id="backgroundButton" class="text-button" type="button" aria-haspopup="dialog" disabled>作品背景</button>
         <button id="dialogueButton" class="text-button" type="button"
           aria-label="打开全部台词" aria-expanded="false">台词</button>
@@ -92,15 +92,16 @@
       <div id="mobileSubtitles" class="mobile-subtitles"></div>
     </section>
 
+    <canvas id="foliaSceneCanvas" class="folia-scene" aria-hidden="true" hidden></canvas>
     <section id="foliaStage" class="folia-stage" aria-label="Folia 沉浸字幕" hidden inert>
-      <div class="folia-heading"><span class="folia-wordmark">FOLIA <i>字幕舞台</i></span><button id="foliaExit" class="text-button" type="button" aria-label="退出 Folia 模式">退出 <span aria-hidden="true">↗</span></button></div>
+      <div class="folia-heading"><span class="folia-wordmark">FOLIA <i>光 · 字 · 境</i></span><div class="folia-actions"><button id="foliaSettings" class="text-button" type="button" aria-expanded="false" aria-controls="listeningControls">听音设置</button><button id="foliaExit" class="text-button" type="button" aria-label="退出 Folia 模式">退出 <span aria-hidden="true">↗</span></button></div></div>
       <div id="foliaBefore" class="folia-context folia-before" aria-label="上一句"></div>
       <div class="folia-reading"><div id="foliaCurrent" class="folia-current" aria-label="当前字幕"></div><div id="foliaGap" class="folia-gap" hidden><b aria-hidden="true">· · ·</b><span>静听片刻</span></div></div>
       <div id="foliaAfter" class="folia-context folia-after" aria-label="下一句"></div>
     </section>
 
     <section id="controls" class="controls" aria-label="播放器控制">
-      <div class="listening-controls">
+      <div id="listeningControls" class="listening-controls">
         <label class="compact-control"><span>听音</span><select id="listeningMode" aria-label="听音模式">
           <option value="binaural">原始双耳</option><option value="split">人物分侧</option>
           <option value="left-only">仅左侧人物源</option><option value="right-only">仅右侧人物源</option>
@@ -146,7 +147,7 @@
   </main>
 
   <dialog id="aiDialog" class="ai-dialog" aria-labelledby="aiHeading">
-    <div class="ai-heading"><div><div class="eyebrow">LISTEN · TRANSCRIBE · TRANSLATE</div><h2 id="aiHeading">AI 字幕工作台 <small>v0.0.8</small></h2></div><button id="aiClose" class="icon-button" type="button" aria-label="关闭 AI 字幕">×</button></div>
+    <div class="ai-heading"><div><div class="eyebrow">LISTEN · TRANSCRIBE · TRANSLATE</div><h2 id="aiHeading">AI 字幕工作台 <small>v0.0.9</small></h2></div><button id="aiClose" class="icon-button" type="button" aria-label="关闭 AI 字幕">×</button></div>
     <p id="aiTrackInfo" class="ai-track-info">先选择一条音轨</p>
     <form id="aiForm" autocomplete="off">
       <fieldset class="ai-task-settings"><legend>处理当前音轨</legend>
@@ -218,7 +219,7 @@
     </div>
   </dialog>
   <dialog id="streamDialog" class="stream-dialog" aria-labelledby="streamHeading">
-    <div class="ai-heading"><div><div class="eyebrow">ONE LINK · PRESS PLAY</div><h2 id="streamHeading">在线作品 <small>v0.0.8</small></h2></div><button id="streamClose" class="icon-button" type="button" aria-label="关闭在线作品">×</button></div>
+    <div class="ai-heading"><div><div class="eyebrow">ONE LINK · PRESS PLAY</div><h2 id="streamHeading">在线作品 <small>v0.0.9</small></h2></div><button id="streamClose" class="icon-button" type="button" aria-label="关闭在线作品">×</button></div>
     <p class="stream-intro">输入公开网页、音频直链或播放列表网址，自动整理作品与音轨。</p>
     <form id="streamForm" class="stream-form">
       <label for="streamUrl">作品网址</label>

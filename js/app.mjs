@@ -338,6 +338,7 @@ function setActiveDrawer(nextDrawer) {
 function scheduleHide() {
   window.clearTimeout(hideTimer);
   if (!player.paused() && activeDrawer === null && !aiWorkbench?.isOpen()
+    && !elements.app.classList.contains('folia-settings-open')
     && !backgroundPicker?.isOpen() && !coverPicker?.isOpen() && !streamWorkbench?.isOpen() && !matchMedia('(pointer: coarse)').matches) {
     hideTimer = window.setTimeout(() => {
       elements.app.classList.add('ui-hidden');
@@ -445,6 +446,7 @@ function renderDialogueList() {
     button.append(time, side, text);
     button.addEventListener('click', () => {
       player.seek(item.start);
+      folia?.update(player.currentTime(),{force:true});
       updateActiveDialogue(item.start, true);
     });
     dialogueNodes.set(item.id, button);
@@ -896,7 +898,7 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
   elements.workTitle.textContent = work.title;
   elements.trackTitle.textContent = track.title;
   elements.subtitleStatus.textContent = '载入中';
-  document.title = `${track.title} · ASMR v0.0.8`;
+  document.title = `${track.title} · ASMR v0.0.9`;
   const semanticKey = trackProfileKey(work.id, track.id);
   const visualReference = selectVisualReference(
     work.visualReferenceUrls,
@@ -1042,7 +1044,7 @@ async function applyLibrary(data, nextLocalLibrary = null, { remoteUpdate = fals
     elements.trackTitle.textContent = '添加在线作品，或打开本机曲库';
     elements.workTitle.textContent = 'ASMR 原声播放器';
     elements.subtitleStatus.textContent = '等待选择';
-    document.title = 'ASMR 原声播放器 · v0.0.8';
+    document.title = 'ASMR 原声播放器 · v0.0.9';
     renderLibrary();
     return;
   }
@@ -1278,11 +1280,12 @@ elements.playButton.addEventListener('click', () => {
 });
 elements.nextButton.addEventListener('click', () => moveTrack(1));
 elements.previousButton.addEventListener('click', () => {
-  if (player.currentTime() > 5) player.seek(0);
+  if (player.currentTime() > 5) { player.seek(0); folia?.update(player.currentTime(),{force:true}); }
   else moveTrack(-1);
 });
 elements.progress.addEventListener('input', () => {
   player.seek((Number(elements.progress.value) / 1000) * player.duration());
+  folia?.update(player.currentTime(),{force:true});
 });
 elements.volume.addEventListener('input', () => {
   player.setVolume(Number(elements.volume.value));
@@ -1348,8 +1351,10 @@ document.addEventListener('keydown', (event) => {
     else player.pause();
   } else if (event.code === 'ArrowLeft') {
     player.seek(Math.max(0, player.currentTime() - 5));
+    folia?.update(player.currentTime(),{force:true});
   } else if (event.code === 'ArrowRight') {
     player.seek(Math.min(player.duration(), player.currentTime() + 5));
+    folia?.update(player.currentTime(),{force:true});
   }
 });
 window.addEventListener('pagehide', (event) => {

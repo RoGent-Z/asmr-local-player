@@ -1,7 +1,8 @@
 import {buildFoliaTimeline, foliaFrameAt} from './folia-timeline.mjs';
+import {createFoliaScene} from './folia-scene.mjs';
+import {segmentFoliaText,foliaGlyphFrame} from './folia-glyphs.mjs';
 
 const PREFERENCE_KEY='asmr-player:folia:v1';
-const clamp=value=>Math.min(1,Math.max(0,value));
 
 /** A presentation of existing cues, driven exclusively by the player's clock. */
 export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},storage}) {
@@ -10,6 +11,12 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
   const before=stage.querySelector('#foliaBefore'),current=stage.querySelector('#foliaCurrent');
   const after=stage.querySelector('#foliaAfter'),gap=stage.querySelector('#foliaGap');
   const exit=stage.querySelector('#foliaExit');
+  const settings=stage.querySelector('#foliaSettings');
+  const rateControl=doc.querySelector('#rate');
+  const canvas=doc.querySelector('#foliaSceneCanvas');
+  const scene=createFoliaScene({canvas,getPixelRatio:()=>window.devicePixelRatio||1});
+  scene.resize(app.clientWidth,app.clientHeight);
+  const motion=matchMedia('(prefers-reduced-motion: reduce)');
   let preferred=false,ready=false,active=false,time=0,signature='',playing=false;
   let timeline=buildFoliaTimeline([]),activeNodes=[],measurement=0;
   try {preferred=storage?.getItem(PREFERENCE_KEY)==='true';} catch { /* Restricted storage: this visit still works. */ }
@@ -25,6 +32,8 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
       // offset metrics ignore the auto-hide transform on the player's chrome.
       stage.style.setProperty('--folia-top',`${header.offsetTop+header.offsetHeight+8}px`);
       stage.style.setProperty('--folia-bottom',`${Math.max(0,app.clientHeight-controls.offsetTop)+8}px`);
+      scene.resize(app.clientWidth,app.clientHeight);
+      if(active)update(time);
     });
   }
   function syncVisibility() {
@@ -33,10 +42,12 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
     button.setAttribute('aria-pressed',String(preferred));
     button.title=preferred?(active?'关闭 Folia 沉浸字幕':'Folia 已开启，等待可用字幕'):'开启 Folia 沉浸字幕';
     stage.hidden=!active;stage.inert=!active;
+    canvas.hidden=!active;
     app.classList.toggle('folia-active',active);
+    if(!active){app.classList.remove('folia-settings-open');settings.setAttribute('aria-expanded','false');}
     normal.setAttribute('aria-hidden',String(active));
     if(active){measure();if(!previous){signature='';update(time);}}
-    else if(previous&&hadFocus)restoreFocus();
+    else if(previous){scene.clear();if(hadFocus)restoreFocus();}
   }
   function changePreference(value,{restore=false}={}) {
     preferred=Boolean(value);
@@ -52,15 +63,21 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
     if(state==='active')line.setAttribute('aria-current','true');
     const voice=doc.createElement('span');voice.className='folia-voice';
     voice.textContent=item.label||(item.side==='left'?'左声部':item.side==='right'?'右声部':'独白');
-    const text=doc.createElement('span');text.className='folia-line-text';text.textContent=item.text;
+    const text=doc.createElement('span');text.className='folia-line-text';
+    const segmented=state==='active'?segmentFoliaText(item.text):{parts:[item.text],decorated:false};
+    if(segmented.decorated){
+      for(const part of segmented.parts){const glyph=doc.createElement('span');glyph.className='folia-glyph';glyph.textContent=part;if(!part.trim())glyph.dataset.blank='true';text.append(glyph);}
+    }else text.textContent=item.text;
+    line.dataset.glyphs=String(segmented.decorated);
     const progress=doc.createElement('span');progress.className='folia-line-progress';progress.setAttribute('aria-hidden','true');
     line.append(voice,text,progress);
-    line.addEventListener('click',()=>{onSeek(item.start);update(item.start);onInteraction();});
+    line.addEventListener('click',()=>{onSeek(item.start);update(item.start,{force:true});onInteraction();});
     return line;
   }
-  function update(nextTime) {
+  function update(nextTime,{force=false}={}) {
     time=Number.isFinite(nextTime)?Math.max(0,nextTime):0;
     if(!active)return;
+    const reducedMotion=motion.matches;
     const frame=foliaFrameAt(timeline,time,{context:1});
     const nextSignature=JSON.stringify([frame.before.map(x=>x.id),frame.active.map(x=>x.id),frame.after.map(x=>x.id)]);
     if(nextSignature!==signature){
@@ -79,7 +96,24 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
       }
       signature=nextSignature;
     }
-    frame.active.forEach((item,index)=>activeNodes[index]?.style.setProperty('--line-progress',`${clamp((time-item.start)/(item.end-item.start))*100}%`));
+    frame.active.forEach((item,index)=>{
+      const line=activeNodes[index];if(!line)return;
+      const glyphs=line.querySelectorAll('.folia-glyph');
+      const light=foliaGlyphFrame(item,time,glyphs.length,{reducedMotion});
+      line.style.setProperty('--line-progress',`${light.progress*100}%`);
+      line.style.setProperty('--sweep',String(light.sweep));
+      line.style.setProperty('--entry-y',`${(1-light.entrance)*9}px`);
+      for(let i=0;i<glyphs.length;i++)glyphs[i].style.setProperty('--glyph-light',String(light.weights[i]));
+    });
+    const model=scene.render({time,...frame,playing,reducedMotion,playbackRate:Number(rateControl?.value)||1,force});
+    stage.dataset.renderer=scene.available?'canvas':'css';
+    stage.dataset.motion=reducedMotion?'reduced':'full';
+    if(model){
+      stage.style.setProperty('--camera-x',`${model.camera.x}px`);
+      stage.style.setProperty('--camera-y',`${model.camera.y}px`);
+      stage.style.setProperty('--camera-rotate',`${model.camera.rotate}deg`);
+      stage.style.setProperty('--camera-scale',String(model.camera.scale));
+    }
   }
   const toggle=()=>{
     changePreference(!preferred);
@@ -87,9 +121,13 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
   };
   const close=()=>changePreference(false,{restore:true});
   button.addEventListener('click',toggle);exit.addEventListener('click',close);
+  const toggleSettings=()=>{const expanded=app.classList.toggle('folia-settings-open');settings.setAttribute('aria-expanded',String(expanded));measure();onInteraction();};
+  settings.addEventListener('click',toggleSettings);
   const observer=new ResizeObserver(()=>{if(active)measure();});
   observer.observe(doc.querySelector('.topbar'));observer.observe(doc.querySelector('#controls'));observer.observe(app);
   window.addEventListener('resize',measure);
+  const motionChanged=()=>{if(active)update(time);};
+  motion.addEventListener('change',motionChanged);
   syncVisibility();
   return {
     setCues(cues){
@@ -98,9 +136,9 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
       update(time);
     },
     setReady(value){ready=Boolean(value);syncVisibility();},
-    setPlaying(value){playing=Boolean(value);stage.dataset.playing=String(playing);},
+    setPlaying(value){playing=Boolean(value);stage.dataset.playing=String(playing);if(active)update(time);},
     update,isActive:()=>active,
     disable({restoreFocus:restore=false}={}){changePreference(false,{restore});},
-    destroy(){observer.disconnect();cancelAnimationFrame(measurement);window.removeEventListener('resize',measure);button.removeEventListener('click',toggle);exit.removeEventListener('click',close);},
+    destroy(){observer.disconnect();cancelAnimationFrame(measurement);window.removeEventListener('resize',measure);motion.removeEventListener('change',motionChanged);scene.destroy();button.removeEventListener('click',toggle);exit.removeEventListener('click',close);settings.removeEventListener('click',toggleSettings);},
   };
 }
