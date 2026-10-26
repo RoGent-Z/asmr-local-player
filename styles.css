@@ -1181,3 +1181,77 @@ button:disabled:hover { transform: none; }
   .stream-footer { align-items: flex-start; flex-direction: column; gap: 8px; }
   .choose-stream-button { max-width: 100%; font-size: 13px; }
 }
+
+/* Folia-inspired reading stage; original DOM renderer, sentence timing only. */
+.folia-toggle { min-height: 44px; }
+.folia-toggle span { margin-left: 4px; color: var(--accent-soft); }
+.folia-toggle[aria-pressed="true"] { border-color: var(--accent-soft); background: #55354896; }
+.app.folia-active { overflow: clip; }
+.folia-active .subtitle-stage { visibility: hidden; }
+.folia-active .spectrum-canvas { opacity: .12; }
+.folia-active .voice-atmosphere { opacity: .3; }
+.folia-stage {
+  position: absolute; z-index: 22; top: var(--folia-top, 100px); bottom: var(--folia-bottom, 190px);
+  left: max(24px, calc((100% - 1160px) / 2)); right: max(24px, calc((100% - 1160px) / 2));
+  display: grid; grid-template-rows: 44px auto minmax(0, 1fr) auto; gap: 14px;
+  padding: 0 34px 16px; overflow: hidden; isolation: isolate;
+}
+.folia-stage::before {
+  content: ''; position: absolute; z-index: -1; inset: 15% 12%; border-radius: 50%;
+  background: radial-gradient(ellipse, #c581a222, #a9a0ee12 38%, transparent 72%);
+  pointer-events: none; animation: folia-breath 14s ease-in-out infinite alternate;
+}
+.folia-stage[data-playing="false"]::before { animation-play-state: paused; }
+.folia-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.folia-wordmark { color: #e0b7ce; font-size: 11px; font-weight: 700; letter-spacing: .3em; }
+.folia-wordmark i { display: inline-block; margin-left: 14px; font-size: 11px; font-style: normal; font-weight: 400; letter-spacing: .12em; color: #b5a8bd; }
+#foliaExit { min-width: 76px; min-height: 44px; padding: 9px 16px; border-radius: 24px; font-size: 12px; }
+#foliaExit span { margin-left: 12px; }
+.folia-reading { position: relative; min-height: 0; overflow: hidden; }
+.folia-current { display: grid; align-content: safe center; gap: 22px; height: 100%; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #b38ba055 transparent; padding: 5px 5px 10px; }
+.folia-stage[data-duet="true"] .folia-current { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+.folia-line { position: relative; display: block; width: 100%; min-width: 0; min-height: 44px; border: 0; border-radius: 8px; padding: 18px 16px 24px; background: transparent; text-align: left; color: #f7eff5; cursor: pointer; }
+.folia-line:hover { background: #edcbe408; }
+.folia-line:focus-visible { outline: 2px solid var(--accent-soft); outline-offset: -2px; }
+.folia-voice { display: block; margin-bottom: 12px; font-size: 11px; line-height: 1.5; font-weight: 500; letter-spacing: .12em; color: #d2bfd8; }
+.folia-line[data-side="left"] .folia-voice { color: #efbdd9; }
+.folia-line[data-side="right"] .folia-voice { color: #b7dcec; }
+.folia-line-text { display: block; white-space: pre-line; overflow-wrap: anywhere; font-weight: 500; line-height: 1.5; letter-spacing: .015em; font-size: clamp(28px, 3.4vw, 50px); text-wrap: pretty; }
+.folia-line[data-phase="active"] { animation: folia-arrive 180ms ease-out both; }
+.folia-stage[data-duet="true"] .folia-current .folia-line-text { font-size: clamp(24px, 2.65vw, 38px); }
+.folia-current .folia-line[data-density="long"] .folia-line-text { font-size: clamp(24px, 2.4vw, 34px); }
+.folia-line-progress { display: block; width: var(--line-progress, 0%); max-width: 100%; height: 2px; margin-top: 22px; background: linear-gradient(90deg, #edbcd4, #b9b2dc); opacity: .55; }
+.folia-context { min-height: 44px; }
+.folia-context:empty { visibility: hidden; }
+.folia-context .folia-line { padding: 8px 20px; opacity: .38; }
+.folia-before .folia-line { opacity: .27; }
+.folia-context .folia-line:hover, .folia-context .folia-line:focus-visible { opacity: .8; }
+.folia-context .folia-voice, .folia-context .folia-line-progress { display: none; }
+.folia-context .folia-line-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 16px; line-height: 1.6; font-weight: 400; }
+.folia-gap { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 20px; color: #baadbf; }
+.folia-gap b { color: #e6bed6; font-size: 42px; letter-spacing: .18em; font-weight: 400; }
+.folia-gap span { margin-top: 10px; font-size: 12px; letter-spacing: .12em; }
+@keyframes folia-arrive { from { opacity: .45; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes folia-breath { from { transform: scale(.9) translateX(-2%); } to { transform: scale(1.08) translateX(2%); } }
+@media (max-width: 600px) {
+  .folia-stage { left: 12px; right: 12px; padding: 0 4px 8px; gap: 4px; }
+  .folia-wordmark { font-size: 10px; }
+  .folia-wordmark i { margin-left: 9px; font-size: 10px; }
+  .folia-current { gap: 12px; }
+  .folia-stage[data-duet="true"] .folia-current { grid-template-columns: 1fr; }
+  .folia-line { padding: 10px 12px 14px; }
+  .folia-line-text, .folia-stage[data-duet="true"] .folia-line-text { font-size: 25px; }
+  .folia-voice { margin-bottom: 6px; font-size: 10px; }
+  .folia-line-progress { margin-top: 12px; }
+  .folia-context .folia-line { padding: 6px 12px; }
+  .folia-context .folia-line-text { font-size: 12px; -webkit-line-clamp: 1; }
+}
+@media (max-width: 600px) and (max-height: 700px), (max-width: 900px) and (max-height: 500px) {
+  .folia-stage { grid-template-rows: 44px minmax(0, 1fr); gap: 0; padding-bottom: 0; }
+  .folia-context { display: none; }
+  .folia-reading { grid-row: 2; }
+  .folia-line-text, .folia-stage[data-duet="true"] .folia-line-text { font-size: 22px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .folia-stage::before, .folia-line[data-phase="active"] { animation: none; }
+}

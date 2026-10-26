@@ -3,6 +3,7 @@ import { buildTrackPlayback } from './playback-mode.mjs';
 import { createAiWorkbench } from './ai-workbench.mjs';
 import { createBackgroundPicker } from './background.mjs';
 import { createCoverPicker } from './cover-picker.mjs';
+import { createFoliaView } from './folia-view.mjs';
 import { displaySourceCues } from './transcript.mjs';
 import {
   activeDialogueIds,
@@ -125,6 +126,7 @@ let aiWorkbench = null;
 let backgroundPicker = null;
 let coverPicker = null;
 let streamWorkbench = null;
+let folia = null;
 const libraryMode = document.querySelector('meta[name="library-source"]')?.content ?? 'local-files';
 let activeDialogueItemIds = new Set();
 const dialogueNodes = new Map();
@@ -157,6 +159,7 @@ player = createPairedPlayer({
     currentSourceStates = sources;
     updateProgress(currentTime, duration);
     renderActiveSubtitles(currentTime);
+    folia?.update(currentTime);
     updateActiveDialogue(currentTime);
     spectrum.setSemanticFrame(semanticFrameAt(semanticTimeline, currentTime));
     spectrum.setDialogueFocus(dialoguePanTarget(cues, currentTime, {
@@ -172,6 +175,7 @@ player = createPairedPlayer({
     }
   },
   onPlayState: (playing) => {
+    folia?.setPlaying(playing);
     elements.playButton.textContent = playing ? 'Ⅱ' : '▶';
     elements.playButton.setAttribute('aria-label', playing ? '暂停' : '播放');
     if (playing) {
@@ -241,6 +245,8 @@ function refreshTrackCues() {
     elements.subtitleStatus.title = preparedTrack.subtitleErrors?.join('\n') ?? '';
   }
   dialogueItems = buildDialogueItems(cues);
+  folia?.setCues(cues);
+  folia?.setReady(trackReady);
   renderDialogueList(); clearSubtitles();
   renderActiveSubtitles(player.currentTime()); updateActiveDialogue(player.currentTime(), true);
 }
@@ -280,6 +286,10 @@ streamWorkbench = createStreamWorkbench({
   },
   onReveal: (work) => { expandedWorks.add(work.id); expandedCollections.add(work.categoryPath); renderLibrary(); setActiveDrawer('library'); },
   onOpenChange: (open) => { if (open) window.clearTimeout(hideTimer); showUi(); },
+});
+
+folia = createFoliaView({app:elements.app,button:document.querySelector('#foliaButton'),stage:document.querySelector('#foliaStage'),
+  storage:remoteStorage,onSeek:time=>player.seek(time),onInteraction:()=>{setActionsOpen(false);showUi();},
 });
 
 function formatTime(seconds) {
@@ -854,6 +864,8 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
   persistCurrent();
   player.pause();
   trackReady = false;
+  folia?.setReady(false);
+  folia?.setCues([]);
   elements.playButton.disabled = true;
   elements.progress.disabled = true;
   preparedTrack = null; aiDocument = null;
@@ -884,7 +896,7 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
   elements.workTitle.textContent = work.title;
   elements.trackTitle.textContent = track.title;
   elements.subtitleStatus.textContent = '载入中';
-  document.title = `${track.title} · ASMR v0.0.7`;
+  document.title = `${track.title} · ASMR v0.0.8`;
   const semanticKey = trackProfileKey(work.id, track.id);
   const visualReference = selectVisualReference(
     work.visualReferenceUrls,
@@ -1003,6 +1015,8 @@ async function applyLibrary(data, nextLocalLibrary = null, { remoteUpdate = fals
   persistCurrent();
   player.pause();
   trackReady = false;
+  folia?.setReady(false);
+  folia?.setCues([]);
   preparedTrack = null; aiDocument = null;
   aiWorkbench?.trackChanged();
   player.load({ nextAlignment: null });
@@ -1028,7 +1042,7 @@ async function applyLibrary(data, nextLocalLibrary = null, { remoteUpdate = fals
     elements.trackTitle.textContent = '添加在线作品，或打开本机曲库';
     elements.workTitle.textContent = 'ASMR 原声播放器';
     elements.subtitleStatus.textContent = '等待选择';
-    document.title = 'ASMR 原声播放器 · v0.0.7';
+    document.title = 'ASMR 原声播放器 · v0.0.8';
     renderLibrary();
     return;
   }
@@ -1309,6 +1323,7 @@ document.addEventListener('pointermove', showUi, { passive: true });
 document.addEventListener('pointerdown', showUi, { passive: true });
 document.addEventListener('keydown', (event) => {
   showUi();
+  const actionsWereOpen=elements.actionsButton.getAttribute('aria-expanded')==='true';
   if (event.key === 'Escape') setActionsOpen(false);
   if (activeDrawer && !document.querySelector('dialog[open]')) {
     if (event.key === 'Escape') { event.preventDefault(); setActiveDrawer(null); return; }
@@ -1321,6 +1336,9 @@ document.addEventListener('keydown', (event) => {
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     }
     return;
+  }
+  if(event.key==='Escape'&&!actionsWereOpen&&!document.querySelector('dialog[open]')&&folia?.isActive()){
+    event.preventDefault();folia.disable({restoreFocus:true});return;
   }
   const tagName = event.target?.tagName;
   if (['INPUT', 'SELECT', 'BUTTON', 'TEXTAREA'].includes(tagName) || aiWorkbench?.isOpen() || backgroundPicker?.isOpen() || coverPicker?.isOpen() || streamWorkbench?.isOpen()) return;
@@ -1342,6 +1360,7 @@ window.addEventListener('pagehide', (event) => {
   if (event.persisted) return;
   player.destroy();
   spectrum.destroy();
+  folia?.destroy();
   localLibrary?.dispose();
 });
 
