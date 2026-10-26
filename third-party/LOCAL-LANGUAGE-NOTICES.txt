@@ -10,8 +10,8 @@ local Vosk acoustic/language model, with the user's explicit authorization.
    https://github.com/ccoreilly/vosk-browser
    Pinned commit: 4b8eb257503108d96819854d3984372903c2259e
    Full license and dependency notices: VOSK-LICENSE.txt, VOSK-NOTICE.txt.
-   Modification: the embedded Base64 worker is extracted byte-for-byte as a
-   separate same-origin file; the main factory points to that file. This avoids
+   Modification: the embedded Base64 worker is extracted as a separate
+   same-origin file with LF line endings; the main factory points to it. This avoids
    enabling JavaScript unsafe-eval in the main page. Recognition weights unchanged.
 
 2. vosk-model-small-ja-0.22
