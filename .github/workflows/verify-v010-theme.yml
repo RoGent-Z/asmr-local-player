@@ -1,0 +1,29 @@
+name: Verify v010 public Folia backdrop
+on:
+  push:
+    branches: [qa/v010-theme]
+permissions:
+  contents: read
+jobs:
+  public-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Anonymous production audio and image theme check
+        env:
+          PLAYWRIGHT_MODULE: playwright
+          PYTHON_EXE: python3
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/v010-theme-probe"
+          cd "$RUNNER_TEMP/v010-theme-probe"
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund playwright@1.62.1
+          if command -v google-chrome > /dev/null; then
+            export BROWSER_CHANNEL=chrome
+          else
+            npx playwright install --with-deps chromium
+          fi
+          export V010_REPORT="$RUNNER_TEMP/v010-technical-summary.json"
+          curl --fail --silent --show-error https://raw.githubusercontent.com/RoGent-Z/asmr-local-player/qa/v010-theme/qa/verify-v010-live.mjs -o probe.mjs
+          node probe.mjs
