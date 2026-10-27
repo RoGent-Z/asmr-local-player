@@ -1,0 +1,30 @@
+name: Verify v0100 public full flow
+on:
+  push:
+    branches: [qa/v0100-full-flow]
+permissions:
+  contents: read
+jobs:
+  public-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Anonymous production import, audio, ZIP and Folia
+        env:
+          PLAYWRIGHT_MODULE: playwright
+          PYTHON_EXE: python3
+          PROBE_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/v0100-probe"
+          cd "$RUNNER_TEMP/v0100-probe"
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund playwright@1.62.1
+          if command -v google-chrome > /dev/null; then
+            export BROWSER_CHANNEL=chrome
+          else
+            npx playwright install --with-deps chromium
+          fi
+          export V0100_REPORT="$RUNNER_TEMP/v0100-technical-summary.json"
+          curl --fail --silent --show-error "https://raw.githubusercontent.com/RoGent-Z/asmr-local-player/$PROBE_SHA/qa/verify-v0100-live.mjs" -o probe.mjs
+          node probe.mjs
