@@ -4,7 +4,7 @@ import { createAiWorkbench } from './ai-workbench.mjs';
 import { createBackgroundPicker } from './background.mjs';
 import { createCoverPicker } from './cover-picker.mjs';
 import { createFoliaView } from './folia-view.mjs';
-import { createLocalWorkbench } from './local-workbench.mjs?v=0.1.3-pack1';
+import { createLocalWorkbench } from './local-workbench.mjs?v=0.1.4';
 import { displaySourceCues, mergeTranscriptDocuments } from './transcript.mjs';
 import {
   activeDialogueIds,

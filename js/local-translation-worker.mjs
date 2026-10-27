@@ -1,6 +1,6 @@
-import {createLocalDictionary} from './local-dictionary.mjs?v=0.1.3-pack1';
+import {createLocalDictionary} from './local-dictionary.mjs?v=0.1.4';
 import {createLanguageStorage,loadLocalDictionary} from './local-language-store.mjs';
-import {validatePhrasePack,phrasePackSummary} from './local-phrases.mjs?v=0.1.3-pack1';
+import {validatePhrasePack,phrasePackSummary} from './local-phrases.mjs?v=0.1.4';
 const storage=createLanguageStorage();let dictionary=null,metadata=null,baseWarning='',loadController=null,generation=0;
 let phrasePack=null,phrasesLoaded=false,phraseRevision=0,phrasePersisted=true;
 async function loadPhrases(){

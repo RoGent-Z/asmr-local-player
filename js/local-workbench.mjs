@@ -1,5 +1,5 @@
-import {createLocalDictionaryClient} from './local-dictionary-client.mjs?v=0.1.3-pack1';
-import {fetchPackCatalog,loadTranslationPack,comparePackVersions,assertPackCompatibility,TRANSLATION_PACK_ID} from './translation-pack-catalog.mjs?v=0.1.3-pack1';
+import {createLocalDictionaryClient} from './local-dictionary-client.mjs?v=0.1.4';
+import {fetchPackCatalog,loadTranslationPack,comparePackVersions,assertPackCompatibility,TRANSLATION_PACK_ID} from './translation-pack-catalog.mjs?v=0.1.4';
 import {createLocalAsr} from './local-asr.mjs';
 import {makeTranscriptDocument,mergeTranscriptDocuments,displaySourceCues,exportTimedText} from './transcript.mjs';
 const ids=['localDialog','localClose','localPrepare','localClearCache','localDictionaryStatus','localAsrStatus','localTrackName','localForm','localTaskMode','localSource','localStart','localCancel','localProgress','localStatus','localDisplayMode','localCoverage','localPreview','localApply','localRestore','localExportVtt','localExportSrt','localExportJson','localPhraseImport','localPhraseFile','localPhraseStatus','localPhraseRemove','localPackInstall','localPackCheck','localPackVersion','localPackStatus'];

@@ -1,5 +1,5 @@
 // Dictionary lookup and explicit rules only; no translation inference/model.
-import {normalizePhraseInput,validatePhrasePack} from './local-phrases.mjs?v=0.1.3-pack1';
+import {normalizePhraseInput,validatePhrasePack} from './local-phrases.mjs?v=0.1.4';
 const JAPANESE=/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u;
 const letters=text=>Array.from(text.matchAll(/[\p{L}\p{N}]/gu)).length;
 const kana=text=>text.replace(/[\u30a1-\u30f6]/g,char=>String.fromCharCode(char.charCodeAt(0)-0x60));

@@ -1,4 +1,4 @@
-import {validatePhrasePack,isPackVersion,PACK_DICTIONARY_VERSION} from './local-phrases.mjs?v=0.1.3-pack1';
+import {validatePhrasePack,isPackVersion,PACK_DICTIONARY_VERSION} from './local-phrases.mjs?v=0.1.4';
 
 export const TRANSLATION_PACK_ID='rogent-asmr-ja-zh';
 export const TRANSLATION_PACK_REPO='https://github.com/RoGent-Z/asmr-zh-translation-pack';
