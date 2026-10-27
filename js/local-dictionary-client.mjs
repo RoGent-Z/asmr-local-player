@@ -20,6 +20,8 @@ export function createLocalDictionaryClient({workerFactory=()=>new Worker(new UR
   }
   async function prepare(options){if(!ready)ready=request('init',{},options).catch(error=>{ready=null;throw error;});return ready;}
   return{prepare,translate:async(cues,options)=>{await prepare(options);return request('translate',{cues},options);},
+    async importPhrases(pack,options){const result=await request('import-phrases',{pack},options);ready=null;return result;},
+    async removePhrases(options){const result=await request('remove-phrases',{},options);ready=null;return result;},
     async clear(){ready=null;return request('clear');},
     destroy(){for(const task of [...pending.values()])task.finish(new DOMException('已关闭','AbortError'));worker?.terminate();worker=null;ready=null;}};
 }

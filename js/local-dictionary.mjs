@@ -1,4 +1,5 @@
 // Dictionary lookup and explicit rules only; no translation inference/model.
+import {normalizePhraseInput,validatePhrasePack} from './local-phrases.mjs';
 const JAPANESE=/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u;
 const letters=text=>Array.from(text.matchAll(/[\p{L}\p{N}]/gu)).length;
 const kana=text=>text.replace(/[\u30a1-\u30f6]/g,char=>String.fromCharCode(char.charCodeAt(0)-0x60));
@@ -36,7 +37,7 @@ function bases(text){
   return out.slice(0,12);
 }
 
-export function createLocalDictionary(records){
+export function createLocalDictionary(records,{phrasePack=null}={}){
   if(!Array.isArray(records)||records.length>400000)throw new Error('词库数据格式无效');
   const index=new Map();let entries=0,maxLength=1;
   for(const row of records){
@@ -49,9 +50,14 @@ export function createLocalDictionary(records){
     }
   }
   for(const phrase of RULES.keys())maxLength=Math.max(maxLength,phrase.length);
+  let phrases=new Map(),glosses=new Map();
+  function setPhrases(pack){const valid=pack?validatePhrasePack(pack):null;phrases=new Map(valid?.entries.map(p=>[p.source,p.target]));glosses=new Map(valid?.glosses?.map(p=>[p.entryId,p.target]));}
+  setPhrases(phrasePack);
 
   function translate(input){
     if(typeof input!=='string'||input.length>24000)throw new Error('待翻译文字过长或格式无效');
+    const remembered=phrases.get(normalizePhraseInput(input));
+    if(remembered){const ending=/[。！？!?]+$/.exec(input)?.[0]||'',text=remembered+(!/[。！？!?]$/.test(remembered)?ending:'');return{text,tokens:[{source:input,translation:text,type:'phrase'}],coverage:1,unknown:[],dictionaryHits:0,ruleHits:0,phraseHits:1};}
     if(!JAPANESE.test(input))return{text:input,tokens:[],coverage:letters(input)?0:1,unknown:letters(input)?[input]:[],dictionaryHits:0,ruleHits:0};
     const source=input.normalize('NFKC').replace(/([\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}])\s+(?=[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}])/gu,'$1');
     const normalized=normalize(source),tokens=[];let offset=0,dictionaryHits=0,ruleHits=0;
@@ -61,10 +67,10 @@ export function createLocalDictionary(records){
         const word=normalized.slice(offset,offset+length);
         if(RULES.has(word)){match={length,translation:RULES.get(word),type:'rule'};break;}
         const entry=index.get(word);
-        if(entry){match={length,translation:entry.translation,type:'dictionary',entryId:entry.id};break;}
+        if(entry){match={length,translation:glosses.get(entry.id)||entry.translation,type:'dictionary',entryId:entry.id};break;}
         if(length>=3)for(const base of bases(word)){
           const candidate=index.get(base.word);
-          if(candidate){match={length,translation:(base.negative?'不':'')+candidate.translation,type:'dictionary',entryId:candidate.id};break;}
+          if(candidate){match={length,translation:(base.negative?'不':'')+(glosses.get(candidate.id)||candidate.translation),type:'dictionary',entryId:candidate.id};break;}
         }
       }
       if(match){
@@ -81,10 +87,11 @@ export function createLocalDictionary(records){
     let text='';
     for(const token of tokens){
       if(!token.translation)continue;
-      const gap=text&&letters(token.translation)&&letters(text.at(-1))?' ':'';
+      const last=Array.from(text).at(-1)||'',first=Array.from(token.translation)[0]||'';
+      const gap=text&&/[\p{L}\p{N}]/u.test(last)&&/[\p{L}\p{N}]/u.test(first)&&!(/\p{Script=Han}/u.test(last)&&/\p{Script=Han}/u.test(first))?' ':'';
       text+=gap+token.translation;
     }
-    return{text:text.trim(),tokens,coverage:total?Math.max(0,1-tokens.filter(t=>t.type==='unknown').reduce((sum,t)=>sum+letters(t.source),0)/total):1,unknown,dictionaryHits,ruleHits};
+    return{text:text.trim(),tokens,coverage:total?Math.max(0,1-tokens.filter(t=>t.type==='unknown').reduce((sum,t)=>sum+letters(t.source),0)/total):1,unknown,dictionaryHits,ruleHits,phraseHits:0,glossHits:tokens.filter(t=>t.entryId&&glosses.has(t.entryId)).length};
   }
-  return{translate,entries,forms:index.size};
+  return{translate,entries,forms:index.size,setPhrases,get phrases(){return phrases.size;},get glosses(){return glosses.size;}};
 }
