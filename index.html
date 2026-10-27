@@ -9,9 +9,10 @@
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://asmr-player-resolver.navyelf7.chatgpt.site https://kiko-play-niptan.one https://*.kiko-play-niptan.one; media-src 'self' blob: https:; connect-src 'self' blob: https:; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="app-version" content="0.1.3">
+  <meta name="app-build" content="translation-pack-1">
   <title>ASMR 原声播放器</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./styles.css?build=translation-pack-1">
 </head>
 <body>
   <main id="app" class="app">
@@ -154,7 +155,14 @@
       <div><span class="eyebrow">日中词库</span><p id="localDictionaryStatus">217,538 条词条 · 尚未准备</p><small>首次下载约 28 MB，之后优先读取本机缓存</small></div>
       <div><span class="eyebrow">日语听写</span><p id="localAsrStatus">本机语音识别 · 尚未加载</p><small>首次下载约 54 MB，运行需要较多可用内存</small></div>
     </div></details>
-    <div class="local-setup-actions"><button id="localPhraseImport" class="text-button" type="button">导入本机学习包</button><button id="localPhraseRemove" class="text-button" type="button">移除学习包</button><input id="localPhraseFile" type="file" accept="application/json,.json" hidden><span id="localPhraseStatus" class="field-help" role="status">可选：本机语料词义偏好与精确短语，仅保存在此浏览器。</span></div>
+    <section class="local-pack-panel" aria-labelledby="localPackHeading">
+      <div class="local-pack-heading"><h3 id="localPackHeading">翻译词组包</h3><a class="field-help" href="https://github.com/RoGent-Z/asmr-zh-translation-pack" target="_blank" rel="noopener noreferrer">版本与来源 ↗</a></div>
+      <p id="localPhraseStatus" class="field-help" role="status">正在读取本机安装状态…</p>
+      <div class="local-pack-actions"><label for="localPackVersion">安装版本<select id="localPackVersion"><option value="latest">最新版本</option></select></label><button id="localPackInstall" class="text-button" type="button">安装／更新词组包</button><button id="localPackCheck" class="text-button" type="button">检查更新</button></div>
+      <p id="localPackStatus" class="field-help" role="status">首次安装约 378 KiB。点击后从 GitHub 下载，校验通过才替换；失败保留原包。</p>
+      <p class="field-help">词义偏好是实验性参考，不代表整句翻译准确率。已安装的包保存在此浏览器，刷新自动恢复。</p>
+      <div class="local-setup-actions"><button id="localPhraseImport" class="text-button" type="button">导入本机学习包</button><button id="localPhraseRemove" class="text-button" type="button">移除学习包</button><input id="localPhraseFile" type="file" accept="application/json,.json" hidden></div>
+    </section>
     <p class="field-help">音频不上传。初次准备需要网络；浏览器清理数据后需重新准备。低内存设备可先选择“只翻译已有字幕”。</p>
     <div class="local-setup-actions"><button id="localPrepare" class="text-button" type="button">准备本地语言库</button><button id="localClearCache" class="text-button" type="button">清除语言缓存</button><a class="field-help" href="./third-party/LOCAL-LANGUAGE-NOTICES.txt" target="_blank" rel="noopener">词库来源与许可 ↗</a></div>
     <form id="localForm">
@@ -274,6 +282,6 @@
     </div>
     <div class="stream-footer"><button id="streamCancel" class="text-button" type="button" disabled>取消当前任务</button><span class="field-help">目录与进度保存在当前浏览器。</span></div>
   </dialog>
-  <script type="module" src="./js/app.mjs?v=0.1.3"></script>
+  <script type="module" src="./js/app.mjs?v=0.1.3&build=translation-pack-1"></script>
 </body>
 </html>

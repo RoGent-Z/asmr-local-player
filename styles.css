@@ -1209,6 +1209,20 @@ button:disabled:hover { transform: none; }
 .local-resources p { margin: 10px 0 7px; font-size: 14px; line-height: 1.6; }
 .local-resources small { display: block; color: var(--text-muted); font-size: 11px; line-height: 1.7; }
 .local-setup-actions,.local-run-actions,.local-result-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.local-pack-panel { margin: 18px 0; padding: 16px; border: 1px solid var(--border-soft); border-radius: 12px; background: #c1d9cb05; min-width: 0; }
+.local-pack-heading { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.local-pack-heading h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.local-pack-panel .field-help { margin: 10px 0; overflow-wrap: anywhere; }
+.local-pack-actions { display: flex; align-items: end; flex-wrap: wrap; gap: 8px; }
+.local-pack-actions label { flex: 1 1 180px; min-width: 0; font-size: 12px; color: var(--text-muted); }
+.local-pack-actions select { display: block; width: 100%; min-height: 44px; margin-top: 6px; }
+.local-pack-actions button { min-height: 44px; }
+@media (max-width: 480px) {
+  .local-pack-panel { padding: 12px; }
+  .local-pack-actions { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+  .local-pack-actions label { grid-column: 1 / -1; }
+  .local-pack-actions button { padding: 10px 7px; font-size: 12px; }
+}
 .local-setup-actions a { margin-left: auto; }
 .local-dialog #localForm { border-top: 1px solid var(--border-soft); padding-top: 20px; margin-top: 20px; }
 .local-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }

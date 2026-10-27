@@ -4,7 +4,7 @@ import { createAiWorkbench } from './ai-workbench.mjs';
 import { createBackgroundPicker } from './background.mjs';
 import { createCoverPicker } from './cover-picker.mjs';
 import { createFoliaView } from './folia-view.mjs';
-import { createLocalWorkbench } from './local-workbench.mjs';
+import { createLocalWorkbench } from './local-workbench.mjs?v=0.1.3-pack1';
 import { displaySourceCues, mergeTranscriptDocuments } from './transcript.mjs';
 import {
   activeDialogueIds,
@@ -1407,6 +1407,9 @@ document.addEventListener('keydown', (event) => {
     player.seek(Math.min(player.duration(), player.currentTime() + 5));
     folia?.update(player.currentTime(),{force:true});
   }
+});
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) localWorkbench?.resume();
 });
 window.addEventListener('pagehide', (event) => {
   aiWorkbench?.clearKeys();

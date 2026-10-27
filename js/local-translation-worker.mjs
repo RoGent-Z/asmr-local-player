@@ -1,8 +1,13 @@
-import {createLocalDictionary} from './local-dictionary.mjs';
+import {createLocalDictionary} from './local-dictionary.mjs?v=0.1.3-pack1';
 import {createLanguageStorage,loadLocalDictionary} from './local-language-store.mjs';
-import {validatePhrasePack} from './local-phrases.mjs';
-const storage=createLanguageStorage();let dictionary=null,metadata=null,loadController=null,generation=0;
-let phrasePack=null,phrasesLoaded=false;
+import {validatePhrasePack,phrasePackSummary} from './local-phrases.mjs?v=0.1.3-pack1';
+const storage=createLanguageStorage();let dictionary=null,metadata=null,baseWarning='',loadController=null,generation=0;
+let phrasePack=null,phrasesLoaded=false,phraseRevision=0,phrasePersisted=true;
+async function loadPhrases(){
+  if(phrasesLoaded)return;const revision=phraseRevision;
+  const value=await storage.get('phrases'),saved=value?validatePhrasePack(value):null;
+  if(revision===phraseRevision&&!phrasesLoaded){phrasePack=saved;phrasesLoaded=true;dictionary?.setPhrases(saved);if(metadata)metadata={...metadata,...phrasePackSummary(saved),warning:baseWarning};}
+}
 const canceled=new Set();
 const post=(id,event,data)=>self.postMessage({id,event,...data});
 self.addEventListener('message',async({data})=>{
@@ -14,10 +19,11 @@ self.addEventListener('message',async({data})=>{
         const current=++generation;loadController=new AbortController();
         const loaded=await loadLocalDictionary({storage,signal:loadController.signal,onProgress:progress=>post(id,'progress',{progress})});
         if(current!==generation||canceled.has(id))throw new Error('词库任务已取消');
-        if(!phrasesLoaded){try{const saved=await storage.get('phrases');phrasePack=saved?validatePhrasePack(saved):null;}catch{phrasePack=null;}phrasesLoaded=true;}
+        baseWarning=loaded.warning||'';let warning=baseWarning;
+        try{await loadPhrases();}catch{warning+=' 本机词组包暂时无法读取，本次仅使用基础词库；重新打开面板可重试，或重新安装词组包。';}
         if(current!==generation||canceled.has(id))throw new Error('词库任务已取消');
         post(id,'progress',{progress:{phase:'index'}});dictionary=createLocalDictionary(loaded.records,{phrasePack});
-        metadata={manifest:loaded.manifest,cached:loaded.cached,persisted:loaded.persisted,warning:loaded.warning,entries:dictionary.entries,forms:dictionary.forms,phrases:dictionary.phrases,glosses:dictionary.glosses};loadController=null;
+        metadata={manifest:loaded.manifest,cached:loaded.cached,persisted:loaded.persisted,warning,entries:dictionary.entries,forms:dictionary.forms,...phrasePackSummary(phrasePack),phrasePersisted};loadController=null;
       }
       post(id,'result',{result:metadata});
     }else if(type==='translate'){
@@ -33,18 +39,20 @@ self.addEventListener('message',async({data})=>{
       }
       if(canceled.has(id))throw new Error('翻译已取消');
       post(id,'result',{result:{cues,coverage:total?matched/total:1,unknown:[...unknown],phraseHits,glossHits}});
+    }else if(type==='phrase-status'){
+      await loadPhrases();post(id,'result',{result:{...phrasePackSummary(phrasePack),persisted:phrasePersisted}});
     }else if(type==='import-phrases'){
       const pack=validatePhrasePack(data.pack);let persisted=true;
       if(canceled.has(id))throw new Error('导入已取消');
-      try{await storage.put('phrases',pack);}catch{persisted=false;}
-      phrasePack=pack;phrasesLoaded=true;dictionary?.setPhrases(pack);if(metadata)metadata={...metadata,phrases:pack.entries.length,glosses:pack.glosses?.length||0};
-      post(id,'result',{result:{phrases:pack.entries.length,glosses:pack.glosses?.length||0,persisted}});
+      ++phraseRevision;try{await storage.put('phrases',pack);}catch{persisted=false;}
+      phrasePack=pack;phrasesLoaded=true;phrasePersisted=persisted;dictionary?.setPhrases(pack);if(metadata)metadata={...metadata,...phrasePackSummary(pack),phrasePersisted,warning:baseWarning};
+      post(id,'result',{result:{...phrasePackSummary(pack),persisted}});
     }else if(type==='remove-phrases'){
-      let persisted=true;try{await storage.put('phrases',null);}catch{persisted=false;}
-      phrasePack=null;phrasesLoaded=true;dictionary?.setPhrases(null);if(metadata)metadata={...metadata,phrases:0,glosses:0};
+      ++phraseRevision;let persisted=true;try{await storage.put('phrases',null);}catch{persisted=false;}
+      phrasePack=null;phrasesLoaded=true;phrasePersisted=persisted;dictionary?.setPhrases(null);if(metadata)metadata={...metadata,...phrasePackSummary(null),phrasePersisted,warning:baseWarning};
       post(id,'result',{result:{persisted}});
     }else if(type==='clear'){
-      ++generation;loadController?.abort();loadController=null;dictionary=null;metadata=null;phrasePack=null;phrasesLoaded=false;
+      ++generation;++phraseRevision;loadController?.abort();loadController=null;dictionary=null;metadata=null;baseWarning='';phrasePack=null;phrasesLoaded=false;phrasePersisted=true;
       await storage.clear();post(id,'result',{result:true});
     }else throw new Error('不支持的本地词库任务');
   }catch(error){post(id,'error',{error:error.message||'本地词库处理失败'});}

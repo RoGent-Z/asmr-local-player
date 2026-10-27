@@ -39,5 +39,13 @@ local Vosk acoustic/language model, with the user's explicit authorization.
 
 The website's rule engine is separately implemented. Dictionary glosses, word
 order and speech recognition can be wrong; these are rough reference captions.
-All language assets come from this website, then use browser-local storage.
+Base language assets come from this website, then use browser-local storage.
+Optional versioned preferences are downloaded only on user request from
+https://github.com/RoGent-Z/asmr-zh-translation-pack (raw.githubusercontent.com).
+Package v0.0.1: 5,433 selected same-sense licensed gloss preferences and no
+sentence memories; CC BY-SA 4.0, retaining JMdict/EDRDG and Y1Z/Tomoshi credit.
+RoGent-Z selected and restructured preferences using aggregate local corpus
+statistics. Source subtitle lines and databases are not redistributed.
+Package metadata and notices are available in that repository. This download
+uses no account/cookies and is verified before browser-local installation.
 No local audio or recognition text is uploaded by this translation feature.

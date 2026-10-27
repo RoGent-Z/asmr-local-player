@@ -1,4 +1,4 @@
-export function createLocalDictionaryClient({workerFactory=()=>new Worker(new URL('./local-translation-worker.mjs',import.meta.url),{type:'module'})}={}){
+export function createLocalDictionaryClient({workerFactory=()=>new Worker(new URL('./local-translation-worker.mjs?v=0.1.3-pack1',import.meta.url),{type:'module'})}={}){
   let worker=null,serial=0,ready=null;const pending=new Map();
   function ensureWorker(){
     if(worker)return worker;worker=workerFactory();
@@ -20,6 +20,7 @@ export function createLocalDictionaryClient({workerFactory=()=>new Worker(new UR
   }
   async function prepare(options){if(!ready)ready=request('init',{},options).catch(error=>{ready=null;throw error;});return ready;}
   return{prepare,translate:async(cues,options)=>{await prepare(options);return request('translate',{cues},options);},
+    async phraseStatus(options){const result=await request('phrase-status',{},options);ready=null;return result;},
     async importPhrases(pack,options){const result=await request('import-phrases',{pack},options);ready=null;return result;},
     async removePhrases(options){const result=await request('remove-phrases',{},options);ready=null;return result;},
     async clear(){ready=null;return request('clear');},
