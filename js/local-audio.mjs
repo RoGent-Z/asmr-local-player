@@ -1,5 +1,6 @@
 import {chunkAudio} from './audio-chunks.mjs';
 import {canReadAiAudio} from './ai-workbench.mjs';
+import {isDirectAudioSource} from './direct-audio.mjs';
 const COMPAT_BYTES=64*1024*1024;
 const check=signal=>{if(signal?.aborted)throw signal.reason||new DOMException('已取消','AbortError');};
 
@@ -21,6 +22,14 @@ export async function openLocalAudio(source,{baseUrl=globalThis.location?.href,f
   const fetchRange=(first,last)=>fetchImpl(url,{headers:{Range:`bytes=${first}-${last}`},signal,credentials:'omit',redirect:'error'});
   const response=await fetchRange(0,0);
   if(response.status===200)return new Blob([await boundedBytes(response,COMPAT_BYTES,signal)],{type:response.headers.get('Content-Type')||'application/octet-stream'});
+  if(response.status===206&&!response.headers.get('Content-Range')&&isDirectAudioSource(source)){
+    await response.body?.cancel();check(signal);
+    const complete=await fetchImpl(url,{signal,credentials:'omit',redirect:'error'});
+    if(complete.status!==200||complete.headers.get('Content-Range')||!/^audio\//i.test(complete.headers.get('Content-Type')||'')){
+      await complete.body?.cancel();throw new Error('音源没有返回可读取的完整音频');
+    }
+    return new Blob([await boundedBytes(complete,COMPAT_BYTES,signal)],{type:complete.headers.get('Content-Type')});
+  }
   const match=/^bytes 0-0\/(\d+)$/.exec(response.headers.get('Content-Range')||'');
   if(response.status!==206||!match){await response.body?.cancel();throw new Error('音源分段 Range 响应无效');}
   const size=Number(match[1]);if(!Number.isSafeInteger(size)||size<1||size>16*1024**3)throw new Error('音源分段大小无效');

@@ -1,6 +1,6 @@
 import {createLocalDictionaryClient} from './local-dictionary-client.mjs';
 import {createLocalAsr} from './local-asr.mjs';
-import {makeTranscriptDocument,displaySourceCues,exportTimedText} from './transcript.mjs';
+import {makeTranscriptDocument,mergeTranscriptDocuments,displaySourceCues,exportTimedText} from './transcript.mjs';
 const ids=['localDialog','localClose','localPrepare','localClearCache','localDictionaryStatus','localAsrStatus','localTrackName','localForm','localTaskMode','localSource','localStart','localCancel','localProgress','localStatus','localDisplayMode','localCoverage','localPreview','localApply','localRestore','localExportVtt','localExportSrt','localExportJson'];
 const root=new URL('../',import.meta.url);
 const canceled=()=>new DOMException('任务已取消','AbortError');
@@ -8,11 +8,13 @@ const canceled=()=>new DOMException('任务已取消','AbortError');
 export function createLocalWorkbench({getContext,onApply,onRestore,onOpenChange=()=>{}}){
   const el=Object.fromEntries(ids.map(id=>[id,document.getElementById(id)])),entry=document.querySelector('#localTranslateButton');
   let dictionary=createLocalDictionaryClient(),metadata=null,asr=null,controller=null,serial=0,busy=false,documentResult=null,summary=null,taskTrack=null;
+  const results=new Map();let viewTrack=null,clearingCache=false;
   const status=(text,error=false)=>{el.localStatus.textContent=text;el.localStatus.classList.toggle('is-error',error);};
   function context(){try{return getContext();}catch{return null;}}
   function setBusy(value){
     busy=value;for(const id of ['localPrepare','localClearCache','localTaskMode','localSource'])el[id].disabled=value;
-    el.localStart.disabled=value||!context()?.sources?.length;el.localCancel.disabled=!value;
+    el.localStart.disabled=value||!context()?.sources?.length;el.localCancel.disabled=!value||clearingCache;
+    el.localRestore.disabled=clearingCache;
   }
   function progress(value,run){
     if(run!==serial)return;
@@ -50,11 +52,14 @@ export function createLocalWorkbench({getContext,onApply,onRestore,onOpenChange=
       const original=document.createElement('p');original.className='local-original';original.textContent=cue.text;
       const translated=document.createElement('p');translated.className='local-chinese';translated.textContent=cue.translation||'未匹配，保留原文';row.append(time,original,translated);el.localPreview.append(row);
     }
-    el.localCoverage.textContent=cues.length?`已生成 ${cues.length} 条字幕${summary?` · 已匹配文字约 ${Math.round(summary.coverage*100)}%`:''}。${summary?.unknown?.length?'未匹配内容保留原文：'+summary.unknown.slice(0,8).join('、'):'词库拼接不保证语序和多义词正确。'}`:'尚未生成结果。';
+    el.localCoverage.textContent=cues.length?`当前结果 ${cues.length} 条字幕${summary?` · 本次翻译匹配文字约 ${Math.round(summary.coverage*100)}%`:''}。${summary?.unknown?.length?'未匹配内容保留原文：'+summary.unknown.slice(0,8).join('、'):'词库拼接不保证语序和多义词正确。'}`:'尚未生成结果。';
     for(const id of ['localApply','localExportVtt','localExportSrt','localExportJson'])el[id].disabled=!cues.length;
   }
   function apply(){
     if(!documentResult||context()?.trackKey!==documentResult.trackKey){status('结果对应的音轨已改变，请回到原音轨或重新处理。',true);return;}
+    results.delete(documentResult.trackKey);
+    results.set(documentResult.trackKey,{document:documentResult,summary,displayMode:el.localDisplayMode.value,source:el.localSource.value});
+    while(results.size>12)results.delete(results.keys().next().value);
     onApply(documentResult,el.localDisplayMode.value);
   }
   function cancel({message=true}={}){
@@ -65,7 +70,7 @@ export function createLocalWorkbench({getContext,onApply,onRestore,onOpenChange=
     setBusy(false);if(running&&message){el.localDialog.dataset.state='canceled';status('任务已取消，播放器保留原有字幕。');}
   }
   async function run(event){
-    event?.preventDefault();const current=context();if(!current?.sources?.length){status('请先打开一个可播放的音轨。',true);return;}
+    event?.preventDefault();if(busy)return;const current=context();if(!current?.sources?.length){status('请先打开一个可播放的音轨。',true);return;}
     const selected=current.sources.filter(source=>el.localSource.value==='all'||source.id===el.localSource.value);
     if(!selected.length)return;
     const audio=el.localTaskMode.value==='audio';
@@ -83,36 +88,51 @@ export function createLocalWorkbench({getContext,onApply,onRestore,onOpenChange=
         sources.push({id:source.id,side:source.side,label:source.label,cues:translated.cues});
       }
       if(run!==serial||signal.aborted||context()?.trackKey!==current.trackKey)throw canceled();
-      documentResult=makeTranscriptDocument({trackKey:current.trackKey,sources});summary={coverage:coverage/selected.length,unknown:[...unknown]};renderResult();apply();
+      const previous=results.get(current.trackKey)?.document||makeTranscriptDocument(current);
+      documentResult=mergeTranscriptDocuments(previous,{trackKey:current.trackKey,sources});summary={coverage:coverage/selected.length,unknown:[...unknown]};renderResult();apply();
       el.localDialog.dataset.state='done';el.localProgress.value=1;status(`本地翻译已完成并应用到播放器。${ready.warning||'译文来自词库和规则，未调用 AI 翻译接口。'}`);
     }catch(error){if(run===serial){el.localDialog.dataset.state=signal.aborted?'canceled':'error';status(signal.aborted?'任务已取消，播放器保留原有字幕。':error.message||'本地翻译失败',!signal.aborted);}}
     finally{if(run===serial){controller=null;setBusy(false);}}
   }
   async function prepareOnly(){
+    if(busy)return;
     const run=++serial;taskTrack=null;controller=new AbortController();const signal=controller.signal;setBusy(true);el.localDialog.dataset.state='preparing';
     try{await prepare(signal,run,true);if(run===serial){status('本地词库与日语听写已准备，可以开始翻译。');el.localDialog.dataset.state='ready';el.localProgress.value=1;}}
     catch(error){if(run===serial){status(error.message||'语言库准备失败',!signal.aborted);el.localDialog.dataset.state=signal.aborted?'canceled':'error';}}
     finally{if(run===serial){controller=null;setBusy(false);}}
   }
   async function clearCache(){
-    cancel({message:false});setBusy(true);
+    if(busy)return;
+    cancel({message:false});const run=serial;taskTrack=null;clearingCache=true;setBusy(true);status('正在清除本地语言缓存…');
     try{
       await dictionary.clear();
+      if(run!==serial)return;
+      el.localDictionaryStatus.textContent='词库缓存已清除';
       await new Promise((resolve,reject)=>{
         const request=indexedDB.deleteDatabase('/vosk'),timer=setTimeout(()=>reject(new Error('识别缓存仍被其他页面使用，请关闭其他播放器页面后重试')),8000);
         request.onsuccess=()=>{clearTimeout(timer);resolve();};request.onerror=()=>{clearTimeout(timer);reject(request.error);};
       });
-      el.localDictionaryStatus.textContent='词库缓存已清除';el.localAsrStatus.textContent='听写缓存已清除';status('语言缓存已清除，需要时可重新准备。');el.localDialog.dataset.state='idle';
-    }catch(error){status(error.message||'缓存清除失败',true);}finally{setBusy(false);}
+      if(run!==serial)return;
+      el.localAsrStatus.textContent='听写缓存已清除';status('语言缓存已清除，需要时可重新准备。');el.localDialog.dataset.state='idle';
+    }catch(error){if(run===serial)status(error.message||'缓存清除失败',true);}finally{if(run===serial){clearingCache=false;setBusy(false);}}
   }
   function trackChanged(){
     const current=context();if(busy&&taskTrack!==null&&current?.trackKey!==taskTrack)cancel();
-    if(documentResult?.trackKey!==current?.trackKey){documentResult=null;summary=null;renderResult();}
+    const changed=viewTrack!==(current?.trackKey||null);viewTrack=current?.trackKey||null;
+    const saved=results.get(viewTrack);
+    if(documentResult?.trackKey!==viewTrack){documentResult=saved?.document||null;summary=saved?.summary||null;renderResult();}
+    if(changed&&!busy){
+      el.localDialog.dataset.state=documentResult?'done':'idle';el.localProgress.value=documentResult?1:0;
+      status(documentResult?'已恢复本页面中的本地翻译结果，可继续应用或导出。':'准备就绪，选择处理方式后开始。');
+      if(saved)el.localDisplayMode.value=saved.displayMode;
+    }
     el.localTrackName.textContent=current?.title||'先打开一个音轨';
+    const selected=changed?saved?.source:el.localSource.value;
     el.localSource.replaceChildren();
     for(const source of [{id:'all',label:'全部音源'},...(current?.sources||[]).map((source,index)=>({id:source.id,label:source.label||`音源 ${index+1}`}))]){
       const option=document.createElement('option');option.value=source.id;option.textContent=source.label;el.localSource.append(option);
     }
+    if([...el.localSource.options].some(option=>option.value===selected))el.localSource.value=selected;
     setBusy(busy);
   }
   function open(){trackChanged();if(!el.localDialog.open){el.localDialog.showModal();onOpenChange(true);}}
@@ -125,7 +145,7 @@ export function createLocalWorkbench({getContext,onApply,onRestore,onOpenChange=
   entry.addEventListener('click',open);el.localClose.addEventListener('click',close);el.localForm.addEventListener('submit',run);el.localCancel.addEventListener('click',()=>cancel());el.localPrepare.addEventListener('click',prepareOnly);el.localClearCache.addEventListener('click',clearCache);
   el.localApply.addEventListener('click',apply);el.localRestore.addEventListener('click',()=>{if(busy)cancel();onRestore();});el.localDisplayMode.addEventListener('change',()=>{if(documentResult)apply();});
   for(const [id,format]of [['localExportVtt','vtt'],['localExportSrt','srt'],['localExportJson','json']])el[id].addEventListener('click',()=>download(format));
-  el.localDialog.addEventListener('close',()=>{onOpenChange(false);(entry.getClientRects().length?entry:document.querySelector('#actionsButton'))?.focus({preventScroll:true});});
+  el.localDialog.addEventListener('close',()=>{if(el.localDialog.open)return;onOpenChange(false);const active=document.activeElement;if(active&&active!==document.body&&!el.localDialog.contains(active))return;(entry.getClientRects().length?entry:document.querySelector('#actionsButton'))?.focus({preventScroll:true});});
   trackChanged();
   return{trackChanged,isOpen:()=>el.localDialog.open,cancel,destroy(){cancel({message:false});dictionary.destroy();asr?.destroy();entry.removeEventListener('click',open);}};
 }

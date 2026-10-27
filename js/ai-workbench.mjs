@@ -1,6 +1,7 @@
 import { runSpeechJob } from './speech-job.mjs';
 import { decodeSubtitleBytes } from './subtitles.mjs';
 import { isTrustedRemoteAudio, isTrustedResolverAsset } from './stream-library.mjs';
+import { isDirectAudioSource } from './direct-audio.mjs';
 import { displaySourceCues, exportTimedText, makeTranscriptDocument, parseTimedText, readTranscriptDocument } from './transcript.mjs';
 
 const SETTINGS_KEY = 'asmr-player:ai-settings:v1';
@@ -11,6 +12,7 @@ export function canReadAiAudio(source, baseUrl) {
     const url = new URL(source.audioUrl,baseUrl);
     return url.protocol === 'blob:' || url.origin === new URL(baseUrl).origin
       || (source.remoteProvider === 'asmr-one' && isTrustedRemoteAudio(url.href))
+      || isDirectAudioSource(source)
       || (source.remoteProvider === 'web' && isTrustedResolverAsset(url.href,source));
   } catch { return false; }
 }
@@ -215,7 +217,13 @@ export function createAiWorkbench({ getContext, onApply, onRestore, onOpenChange
     el.aiDialog.showModal(); onOpenChange?.(true); modeUi();
   });
   el.aiClose.addEventListener('click', () => el.aiDialog.close());
-  el.aiDialog.addEventListener('close', () => onOpenChange?.(false));
+  el.aiDialog.addEventListener('close', () => {
+    if(el.aiDialog.open)return;
+    onOpenChange?.(false);
+    const active=document.activeElement;
+    if(active&&active!==document.body&&!el.aiDialog.contains(active))return;
+    (el.aiButton.getClientRects().length?el.aiButton:document.getElementById('actionsButton'))?.focus({preventScroll:true});
+  });
   el.aiForm.addEventListener('submit', run);
   el.aiCancel.addEventListener('click', cancel);
   el.aiForgetKeys.addEventListener('click', () => { clearKeys(); setStatus('Key 已从输入框清空；进行中的任务已请求取消。'); });
@@ -242,7 +250,7 @@ export function createAiWorkbench({ getContext, onApply, onRestore, onOpenChange
     const url = URL.createObjectURL(new Blob([text], { type: format === 'json' ? 'application/json' : 'text/plain;charset=utf-8' }));
     const link = document.createElement('a'); link.href = url;
     const sourceNumber = Math.max(0, doc.sources.indexOf(selected)) + 1;
-    link.download = `asmr-v0.0.11-${format === 'json' ? 'all' : `source${sourceNumber}`}-${el.aiDisplayMode.value}.${format}`;
+    link.download = `asmr-v${document.querySelector('meta[name="app-version"]').content}-${format === 'json' ? 'all' : `source${sourceNumber}`}-${el.aiDisplayMode.value}.${format}`;
     link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
   el.aiImport.addEventListener('click', () => el.aiImportFile.click());

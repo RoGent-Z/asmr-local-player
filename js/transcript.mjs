@@ -87,6 +87,14 @@ export function readTranscriptDocument(text, expectedTrackKey) {
   return doc;
 }
 
+export function mergeTranscriptDocuments(base, update) {
+  const original=makeTranscriptDocument(base),patch=makeTranscriptDocument(update);
+  if(original.trackKey!==patch.trackKey)throw new Error('字幕结果与当前音轨不匹配');
+  if(patch.sources.some(source=>!original.sources.some(item=>item.id===source.id)))throw new Error('结果中的音源与当前音轨不匹配');
+  const sources=new Map(patch.sources.map(source=>[source.id,source]));
+  return {...original,sources:original.sources.map(source=>sources.get(source.id)||source)};
+}
+
 export function displaySourceCues(source, mode = 'bilingual') {
   return source.cues.map((cue) => {
     const body = mode === 'original' || !cue.translation ? cue.text

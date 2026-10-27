@@ -79,7 +79,11 @@ export function createCoverPicker({ onChange = () => {}, onOpenChange = () => {}
   document.querySelector('#coverLater').addEventListener('click', () => dialog.close());
   document.querySelector('#coverAutomatic').addEventListener('click', () => save(undefined));
   dialog.addEventListener('close', () => {
+    if (dialog.open) return; // Ignore a queued close from an earlier opening.
     onOpenChange(false);
+    const active = document.activeElement;
+    // Native focus may already have returned and the user may have moved on.
+    if (active && active !== document.body && !dialog.contains(active)) return;
     [...document.querySelectorAll('[data-focus-key]')].find(node => node.dataset.focusKey === returnFocus)?.focus({ preventScroll:true });
   });
   return { resolve, open, markFailed, isOpen: () => dialog.open,

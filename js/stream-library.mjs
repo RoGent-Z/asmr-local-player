@@ -1,4 +1,6 @@
-// Persist online manifests only. Generic media uses the validated resolver asset route.
+import {isDirectAudioUrl,probeDirectAudio} from './direct-audio.mjs';
+// Persist online manifests only. CORS audio can use the user's exact URL;
+// webpage extraction uses the validated resolver asset route.
 export const DEFAULT_RESOLVER = 'https://asmr-player-resolver.navyelf7.chatgpt.site';
 export const REMOTE_STORAGE_KEY = 'asmr-player:remote-library:v1';
 const CATEGORY = 'remote:asmr-one';
@@ -11,6 +13,19 @@ const stem = path => path.replace(/\.[^.\/]+$/, '');
 const subtitleFormats = ['vtt', 'srt', 'ass', 'ssa', 'lrc'];
 const audioFormats = ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'opus', 'flac', 'webm', 'mp4', 'oga'];
 const abortError = () => new DOMException('已取消', 'AbortError');
+
+async function withRequestDeadline(run,signal,timeoutMs) {
+  const controller=new AbortController();let timedOut=false,timer;
+  const abort=()=>controller.abort(signal.reason);
+  signal?.addEventListener('abort',abort,{once:true});
+  if(signal?.aborted)abort();
+  const deadline=new Promise((_resolve,reject)=>{timer=setTimeout(()=>{
+    timedOut=true;controller.abort();reject(new Error('读取作品超时，请稍后重试；公开音频直链可直接添加。'));
+  },timeoutMs);});
+  try{return await Promise.race([run(controller.signal),deadline]);}
+  catch(error){if(signal?.aborted)throw abortError();if(timedOut)throw new Error('读取作品超时，请稍后重试；公开音频直链可直接添加。');throw error;}
+  finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
+}
 
 export function parseWorkUrl(value) {
   let candidate = String(value).trim();
@@ -65,6 +80,8 @@ function cleanManifest(input, resolverBase) {
   if (!input || input.version !== 1 || !isOnlineWork(input)) throw new Error('解析服务返回的作品格式无效。');
   let source = parseWorkUrl(input.sourceUrl);
   const webSource = input.provider === 'web' ? source.sourceUrl : null;
+  const direct = input.transport === 'direct';
+  if(direct&&(!webSource||!isDirectAudioUrl(webSource)||input.entries?.length!==1||input.coverUrl))throw new Error('音频直链目录无效。');
   if (webSource) {
     if (!/^[a-f0-9]{24}$/.test(input.workId)) throw new Error('解析结果的作品标识无效。');
     source = {sourceUrl:webSource,workId:input.workId,code:typeof input.code === 'string' ? input.code.slice(0,100) : ''};
@@ -82,17 +99,18 @@ function cleanManifest(input, resolverBase) {
     if (!id || seenIds.has(id)) throw new Error('作品目录中包含无效或重复的资源标识。');
     seenIds.add(id);
     const type = ['audio','image','subtitle','other'].includes(entry.type) ? entry.type : 'other';
-    const url = safeAssetUrl(entry.url, resolverBase, type === 'audio',webSource,webSource ? id : undefined);
+    if(direct&&(type!=='audio'||entry.url!==webSource||(entry.downloadUrl&&entry.downloadUrl!==webSource)||entry.subtitleId))throw new Error('音频直链必须与输入网址一致。');
+    const url = direct ? webSource : safeAssetUrl(entry.url, resolverBase, type === 'audio',webSource,webSource ? id : undefined);
     return {
       id, path, type, url,
-      downloadUrl: safeAssetUrl(entry.downloadUrl || url, resolverBase, type === 'audio',webSource,webSource ? id : undefined),
+      downloadUrl: direct ? webSource : safeAssetUrl(entry.downloadUrl || url, resolverBase, type === 'audio',webSource,webSource ? id : undefined),
       ...(type === 'audio' && typeof entry.subtitleId === 'string' ? {subtitleId:entry.subtitleId.slice(0,2000)} : {}),
       ...(Number.isFinite(entry.size) && entry.size >= 0 ? { size: entry.size } : {}),
       ...(Number.isFinite(entry.duration) && entry.duration > 0 ? { duration: entry.duration } : {}),
       ...(type === 'subtitle' ? { subtitleFormat: subtitleFormats.includes(entry.subtitleFormat) ? entry.subtitleFormat : ext(path) } : {}),
     };
   });
-  return { version: 1, provider: input.provider, ...source,
+  return { version: 1, provider: input.provider, ...source, ...(direct?{transport:'direct'}:{}),
     title: typeof input.title === 'string' && input.title.trim() ? input.title.slice(0, 2000) : source.code || new URL(source.sourceUrl).hostname,
     coverUrl: input.coverUrl ? safeAssetUrl(input.coverUrl, resolverBase,false,webSource) : null,
     entries, resolvedAt: typeof input.resolvedAt === 'string' ? input.resolvedAt.slice(0, 100) : new Date().toISOString() };
@@ -196,7 +214,7 @@ export function remoteWorkFromManifest(input, { resolverBase = DEFAULT_RESOLVER,
     const source = { id: entry.path, side: 'center', label: null, hairPalette: [], colorVersion: null,
       audioUrl: entry.url, subtitleUrl: subtitle?.url ?? null, subtitleFormat: subtitle?.subtitleFormat ?? null,
       remoteProvider: manifest.provider, audioFormat:ext(entry.path),
-      ...(manifest.provider === 'web' ? {resolverBase,sourceUrl:manifest.sourceUrl} : {}) };
+      ...(manifest.provider === 'web' ? {resolverBase,sourceUrl:manifest.sourceUrl,...(manifest.transport==='direct'?{transport:'direct'}:{})} : {}) };
     return { id: entry.path, title: base(stem(entry.path)), trackNumber: Number(/Track\s*(\d+)/i.exec(base(entry.path))?.[1]) || null,
       folderPath: dir(entry.path), mode: 'single', sources: [source], audioUrl: source.audioUrl, subtitleUrl: source.subtitleUrl };
   }).sort((a,b)=>collator.compare(a.folderPath,b.folderPath) || collator.compare(a.id,b.id));
@@ -223,7 +241,7 @@ export function canKeepCurrentTrack(previousWork, previousTrack, nextWork) {
       && source.audioUrl === previousTrack.sources[index].audioUrl && source.subtitleUrl === previousTrack.sources[index].subtitleUrl));
 }
 
-export function createRemoteLibrary({ storage, resolverBase = DEFAULT_RESOLVER, fetch: fetchImpl = globalThis.fetch } = {}) {
+export function createRemoteLibrary({ storage, resolverBase = DEFAULT_RESOLVER, fetch: fetchImpl = globalThis.fetch, requestTimeoutMs=30000 } = {}) {
   const registry = new Map();
   let persistenceFailed = false;
   function save() {
@@ -232,6 +250,15 @@ export function createRemoteLibrary({ storage, resolverBase = DEFAULT_RESOLVER, 
       if (json.length > MAX_STORE_BYTES) throw new Error('storage-limit');
       storage?.setItem(REMOTE_STORAGE_KEY,json); persistenceFailed = !storage;
     } catch { persistenceFailed = true; }
+  }
+  function remember(input,source) {
+    const previous=[...registry.values()].find(work=>work.sourceUrl===source.sourceUrl);
+    let format=previous?.format;
+    if(format&&format!=='all'&&!input.entries?.some(entry=>entry.type==='audio'&&ext(entry.path)===format))format=undefined;
+    const work=remoteWorkFromManifest(input,{resolverBase,format});
+    if(work.sourceUrl!==source.sourceUrl)throw new Error('解析结果与输入的作品网址不一致。');
+    if(previous&&previous.id!==work.id)registry.delete(previous.id);
+    registry.set(work.id,work);save();return work;
   }
   try {
     const raw = storage?.getItem(REMOTE_STORAGE_KEY);
@@ -246,8 +273,12 @@ export function createRemoteLibrary({ storage, resolverBase = DEFAULT_RESOLVER, 
     works: () => [...registry.values()],
     persistenceFailed: () => persistenceFailed,
     async resolve(value, { signal } = {}) {
+      return withRequestDeadline(async signal=>{
       const source = parseWorkUrl(value);
       if (signal?.aborted) throw abortError();
+      const direct=isDirectAudioUrl(source.sourceUrl)?await probeDirectAudio(source.sourceUrl,{fetchImpl,signal}):null;
+      if(signal?.aborted)throw abortError();
+      if(direct)return remember(direct,source);
       const endpoint = new URL('/api/resolve', resolverBase); endpoint.searchParams.set('url',source.sourceUrl);
       let response;
       try { response = await fetchImpl(endpoint.href, {signal,credentials:'omit',redirect:'error'}); }
@@ -273,13 +304,8 @@ export function createRemoteLibrary({ storage, resolverBase = DEFAULT_RESOLVER, 
       let input;
       try { input = await response.json(); } catch { if (signal?.aborted) throw abortError(); throw new Error('作品解析服务返回的目录无法读取，请稍后重试。'); }
       if (signal?.aborted) throw abortError();
-      const previous = [...registry.values()].find(work=>work.sourceUrl === source.sourceUrl);
-      let format = previous?.format;
-      if (format && format !== 'all' && !input.entries?.some(entry=>entry.type === 'audio' && ext(entry.path) === format)) format = undefined;
-      const work = remoteWorkFromManifest(input,{resolverBase,format});
-      if (work.sourceUrl !== source.sourceUrl) throw new Error('解析结果与输入的作品网址不一致。');
-      if (previous && previous.id !== work.id) registry.delete(previous.id);
-      registry.set(work.id,work); save(); return work;
+      return remember(input,source);
+      },signal,requestTimeoutMs);
     },
     setFormat(id,format) {
       const previous = registry.get(id); if (!previous) return null;

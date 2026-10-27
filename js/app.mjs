@@ -5,7 +5,7 @@ import { createBackgroundPicker } from './background.mjs';
 import { createCoverPicker } from './cover-picker.mjs';
 import { createFoliaView } from './folia-view.mjs';
 import { createLocalWorkbench } from './local-workbench.mjs';
-import { displaySourceCues } from './transcript.mjs';
+import { displaySourceCues, mergeTranscriptDocuments } from './transcript.mjs';
 import {
   activeDialogueIds,
   buildDialogueItems,
@@ -130,6 +130,8 @@ let streamWorkbench = null;
 let folia = null;
 let localWorkbench = null;
 let subtitleMethod = 'ai';
+const subtitleSessions = new Map();
+let restoringSubtitleSession = false;
 const libraryMode = document.querySelector('meta[name="library-source"]')?.content ?? 'local-files';
 let activeDialogueItemIds = new Set();
 const dialogueNodes = new Map();
@@ -225,7 +227,7 @@ function getAiContext() {
 
 function aiPresentationCues(doc, mode) {
   if (!preparedTrack) return [];
-  return doc.sources.flatMap((source) => {
+  return mergeTranscriptDocuments(getAiContext(),doc).sources.flatMap((source) => {
       const side = currentTrack().mode === 'paired' && source.side === 'right' ? 'right' : 'left';
       return displaySourceCues(source, mode).map((cue) => ({
         ...cue,
@@ -266,10 +268,36 @@ function configureListening() {
   if (!paired) elements.listeningMode.value = 'binaural';
 }
 
+function rememberSubtitleSession(value) {
+  const key=getAiContext()?.trackKey;if(!key)return;
+  subtitleSessions.delete(key);subtitleSessions.set(key,value);
+  while(subtitleSessions.size>12)subtitleSessions.delete(subtitleSessions.keys().next().value);
+}
+
+function applySubtitleResult(doc,mode,method) {
+  if(restoringSubtitleSession||getAiContext()?.trackKey!==doc?.trackKey)return;
+  subtitleMethod=method;aiDocument=doc;aiDisplayMode=mode;
+  rememberSubtitleSession({doc,mode,method});refreshTrackCues();
+}
+
+function restoreOriginalSubtitles() {
+  aiDocument=null;rememberSubtitleSession(null);refreshTrackCues();
+}
+
+function restoreSubtitleSession() {
+  restoringSubtitleSession=true;
+  try{aiWorkbench.trackChanged();localWorkbench?.trackChanged();}
+  finally{restoringSubtitleSession=false;}
+  const saved=subtitleSessions.get(getAiContext()?.trackKey);
+  aiDocument=saved?.doc||null;
+  if(saved){aiDisplayMode=saved.mode;subtitleMethod=saved.method;}
+  refreshTrackCues();
+}
+
 aiWorkbench = createAiWorkbench({
   getContext: getAiContext,
-  onApply: (doc, mode) => { subtitleMethod = 'ai'; aiDocument = doc; aiDisplayMode = mode; refreshTrackCues(); },
-  onRestore: () => { aiDocument = null; refreshTrackCues(); },
+  onApply: (doc, mode) => applySubtitleResult(doc,mode,'ai'),
+  onRestore: restoreOriginalSubtitles,
   onOpenChange: (open) => { if (open) { setActiveDrawer(null); window.clearTimeout(hideTimer); } showUi(); },
 });
 backgroundPicker = createBackgroundPicker({
@@ -279,8 +307,8 @@ backgroundPicker = createBackgroundPicker({
 });
 localWorkbench = createLocalWorkbench({
   getContext: getAiContext,
-  onApply: (doc, mode) => { subtitleMethod = 'local'; aiDocument = doc; aiDisplayMode = mode; refreshTrackCues(); },
-  onRestore: () => { aiDocument = null; refreshTrackCues(); },
+  onApply: (doc, mode) => applySubtitleResult(doc,mode,'local'),
+  onRestore: restoreOriginalSubtitles,
   onOpenChange: (open) => { if (open) { setActiveDrawer(null); setActionsOpen(false); window.clearTimeout(hideTimer); } showUi(); },
 });
 coverPicker = createCoverPicker({
@@ -339,7 +367,10 @@ function setActiveDrawer(nextDrawer) {
   elements.dialogueDrawer.setAttribute('aria-hidden', String(!dialogueOpen));
   if (!document.querySelector('dialog[open]')) {
     if (nextDrawer && nextDrawer !== previousDrawer) (libraryOpen ? elements.closeDrawerButton : elements.closeDialogueButton).focus({ preventScroll:true });
-    else if (!nextDrawer && previousDrawer) (previousDrawer === 'library' ? elements.menuButton : elements.dialogueButton).focus({ preventScroll:true });
+    else if (!nextDrawer && previousDrawer) {
+      const trigger=previousDrawer==='library'?elements.menuButton:elements.dialogueButton;
+      (trigger.getClientRects().length?trigger:elements.actionsButton).focus({preventScroll:true});
+    }
   }
   if (dialogueOpen) updateActiveDialogue(player.currentTime(), true);
   showUi();
@@ -909,7 +940,7 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
   elements.workTitle.textContent = work.title;
   elements.trackTitle.textContent = track.title;
   elements.subtitleStatus.textContent = '载入中';
-  document.title = `${track.title} · ASMR v0.0.11`;
+  document.title = `${track.title} · ASMR v${document.querySelector('meta[name="app-version"]').content}`;
   const semanticKey = trackProfileKey(work.id, track.id);
   const visualReference = selectVisualReference(
     work.visualReferenceUrls,
@@ -969,9 +1000,7 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
     spectrum.setDialogueFocus(dialoguePanTarget(cues, player.currentTime(), {
       paired: prepared.paired,
     }));
-    refreshTrackCues();
-    aiWorkbench.trackChanged();
-    localWorkbench?.trackChanged();
+    restoreSubtitleSession();
     renderActiveSubtitles(player.currentTime());
     updateActiveDialogue(player.currentTime(), activeDrawer === 'dialogue');
     if (autoplay) {
@@ -1340,7 +1369,12 @@ document.addEventListener('pointerdown', showUi, { passive: true });
 document.addEventListener('keydown', (event) => {
   showUi();
   const actionsWereOpen=elements.actionsButton.getAttribute('aria-expanded')==='true';
-  if (event.key === 'Escape') setActionsOpen(false);
+  if (event.key === 'Escape') {
+    setActionsOpen(false);
+    if(actionsWereOpen&&!activeDrawer&&!document.querySelector('dialog[open]')){
+      event.preventDefault();elements.actionsButton.focus({preventScroll:true});return;
+    }
+  }
   if (activeDrawer && !document.querySelector('dialog[open]')) {
     if (event.key === 'Escape') { event.preventDefault(); setActiveDrawer(null); return; }
     if (event.key === 'Tab') {
