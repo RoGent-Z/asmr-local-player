@@ -1,4 +1,5 @@
-// Audio is never decoded here. Only bounded headers are read; payloads stay Blob slices.
+// Audio is never decoded here. Local payloads remain Blob slices; remote payloads
+// are fetched one bounded chunk at a time.
 const READ_BYTES = 64 * 1024;
 const PREROLL_SECONDS = 0.75;
 const MPEG1_BITRATES = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320];
@@ -19,6 +20,18 @@ function putText(bytes, offset, value) {
 }
 function chunkResult(blob, extension, index, start, end, ownedStart = start) {
   return { blob, filename: `audio-${String(index + 1).padStart(4, '0')}.${extension}`, start, duration: end - start, index, ownedStart, ownedEnd: end };
+}
+
+async function audioSlice(blob, start, end, type, signal) {
+  checkAbort(signal);
+  const part = blob.slice(start, end, type);
+  if (part instanceof Blob) return part;
+  // Remote Range sources expose a lazy slice, not a BlobPart. Read only this
+  // bounded chunk before wrapping it; Blob([part]) would stringify the object.
+  const bytes = await part.arrayBuffer();
+  checkAbort(signal);
+  if (bytes.byteLength !== end - start) throw new Error('音频分段不完整。');
+  return new Blob([bytes], { type });
 }
 
 function makeReader(blob, signal, onScanProgress) {
@@ -123,7 +136,8 @@ async function* chunkWave(blob, reader, options, first) {
     const size = count * blockAlign;
     const offset = data.start + sample * blockAlign;
     const header = waveHeader(fmt, format, size, count);
-    const payload = new Blob([header, blob.slice(offset, offset + size), new Uint8Array(size % 2)], { type: 'audio/wav' });
+    const part = await audioSlice(blob, offset, offset + size, 'audio/wav', signal);
+    const payload = new Blob([header, part, new Uint8Array(size % 2)], { type: 'audio/wav' });
     const end = (sample + count) / sampleRate;
     reader.progress(offset + size, end);
     yield chunkResult(payload, 'wav', index++, sample / sampleRate, end);
@@ -209,8 +223,9 @@ async function* chunkMp3(blob, reader, { chunkSeconds, maxBytes, signal }) {
   let index = 0;
   let recent = [];
   const preroll = Math.min(PREROLL_SECONDS, chunkSeconds / 2);
-  function output() {
-    return chunkResult(blob.slice(chunkStart.offset, chunkEnd.endOffset, 'audio/mpeg'), 'mp3', index++, chunkStart.time, chunkEnd.endTime, ownedStart);
+  async function output() {
+    const payload = await audioSlice(blob, chunkStart.offset, chunkEnd.endOffset, 'audio/mpeg', signal);
+    return chunkResult(payload, 'mp3', index++, chunkStart.time, chunkEnd.endTime, ownedStart);
   }
   while (at < bounds.end) {
     checkAbort(signal);

@@ -8,7 +8,7 @@
   <meta name="stream-resolver" content="https://asmr-player-resolver.navyelf7.chatgpt.site">
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://asmr-player-resolver.navyelf7.chatgpt.site https://kiko-play-niptan.one https://*.kiko-play-niptan.one; media-src 'self' blob: https:; connect-src 'self' blob: https:; object-src 'none'; base-uri 'none'; form-action 'none'">
-  <meta name="app-version" content="0.1.1">
+  <meta name="app-version" content="0.1.2">
   <title>ASMR 原声播放器</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="./styles.css">
@@ -149,7 +149,7 @@
 
   <dialog id="localDialog" class="ai-dialog local-dialog" aria-labelledby="localHeading" data-state="idle">
     <div class="ai-heading local-heading"><div><div class="eyebrow">ON YOUR DEVICE · DICTIONARY TRANSLATION</div><h2 id="localHeading">本地日语翻译 <small>实验版</small></h2></div><button id="localClose" class="icon-button" type="button" aria-label="关闭本地日语翻译">×</button></div>
-    <p class="local-intro">把日语音声变成字幕，再用网站自带词库匹配中文。<br>听写在本机运行，翻译只用词库和规则，无需账号或 API Key。</p>
+    <p class="local-intro">把在线或本机的日语音声变成字幕，再用网站自带词库匹配中文。<br>听写在本机运行，翻译只用词库和规则，无需账号或 API Key。</p>
     <details id="localResourcesPanel" class="local-resources-panel" open><summary>本地语言库 <span id="localResourcesSummary">首次下载约 82 MB</span></summary><div class="local-resources" aria-label="本地语言库状态">
       <div><span class="eyebrow">日中词库</span><p id="localDictionaryStatus">217,538 条词条 · 尚未准备</p><small>首次下载约 28 MB，之后优先读取本机缓存</small></div>
       <div><span class="eyebrow">日语听写</span><p id="localAsrStatus">本机语音识别 · 尚未加载</p><small>首次下载约 54 MB，运行需要较多可用内存</small></div>
@@ -273,6 +273,6 @@
     </div>
     <div class="stream-footer"><button id="streamCancel" class="text-button" type="button" disabled>取消当前任务</button><span class="field-help">目录与进度保存在当前浏览器。</span></div>
   </dialog>
-  <script type="module" src="./js/app.mjs?v=0.1.1"></script>
+  <script type="module" src="./js/app.mjs?v=0.1.2"></script>
 </body>
 </html>
