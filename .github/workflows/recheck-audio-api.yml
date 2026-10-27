@@ -1,0 +1,29 @@
+name: Recheck production audio interfaces
+on:
+  push:
+    branches: [qa/audio-api-recheck]
+permissions:
+  contents: read
+jobs:
+  network-comparison:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Probe resolver, both ASMR works and real audio from Linux
+        env:
+          PLAYWRIGHT_MODULE: playwright
+          PROBE_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/audio-api-recheck"
+          cd "$RUNNER_TEMP/audio-api-recheck"
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund playwright@1.62.1
+          if command -v google-chrome > /dev/null; then
+            export BROWSER_CHANNEL=chrome
+          else
+            npx playwright install --with-deps chromium
+          fi
+          export AUDIO_API_REPORT="$RUNNER_TEMP/audio-api-recheck.json"
+          curl --fail --silent --show-error "https://raw.githubusercontent.com/RoGent-Z/asmr-local-player/$PROBE_SHA/qa/recheck-audio-api.mjs" -o probe.mjs
+          node probe.mjs
