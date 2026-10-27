@@ -36,6 +36,10 @@ import {
 import { createSpectrumRenderer } from './spectrum.mjs';
 import { assignSourceIdentity, decodeSubtitleBytes, parseSubtitle } from './subtitles.mjs';
 
+const appVersion = document.querySelector('meta[name="app-version"]').content;
+for (const label of document.querySelectorAll('[data-app-version]')) label.textContent = `v${appVersion}`;
+document.title = `ASMR 原声播放器 · v${appVersion}`;
+
 const elements = {
   app: document.querySelector('#app'),
   actionsButton: document.querySelector('#actionsButton'),
@@ -940,7 +944,7 @@ async function selectTrack(nextWorkIndex, nextTrackIndex, autoplay = false) {
   elements.workTitle.textContent = work.title;
   elements.trackTitle.textContent = track.title;
   elements.subtitleStatus.textContent = '载入中';
-  document.title = `${track.title} · ASMR v${document.querySelector('meta[name="app-version"]').content}`;
+  document.title = `${track.title} · ASMR v${appVersion}`;
   const semanticKey = trackProfileKey(work.id, track.id);
   const visualReference = selectVisualReference(
     work.visualReferenceUrls,
@@ -1086,7 +1090,7 @@ async function applyLibrary(data, nextLocalLibrary = null, { remoteUpdate = fals
     elements.trackTitle.textContent = '添加在线作品，或打开本机曲库';
     elements.workTitle.textContent = 'ASMR 原声播放器';
     elements.subtitleStatus.textContent = '等待选择';
-    document.title = 'ASMR 原声播放器 · v0.0.11';
+    document.title = `ASMR 原声播放器 · v${appVersion}`;
     renderLibrary();
     return;
   }

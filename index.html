@@ -8,8 +8,8 @@
   <meta name="stream-resolver" content="https://asmr-player-resolver.navyelf7.chatgpt.site">
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://asmr-player-resolver.navyelf7.chatgpt.site https://kiko-play-niptan.one https://*.kiko-play-niptan.one; media-src 'self' blob: https:; connect-src 'self' blob: https:; object-src 'none'; base-uri 'none'; form-action 'none'">
-  <meta name="app-version" content="0.1.0">
-  <title>ASMR 原声播放器 · v0.1.0</title>
+  <meta name="app-version" content="0.1.1">
+  <title>ASMR 原声播放器</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -176,7 +176,7 @@
   </dialog>
 
   <dialog id="aiDialog" class="ai-dialog" aria-labelledby="aiHeading">
-    <div class="ai-heading"><div><div class="eyebrow">LISTEN · TRANSCRIBE · TRANSLATE</div><h2 id="aiHeading">AI 字幕工作台 <small>v0.1.0</small></h2></div><button id="aiClose" class="icon-button" type="button" aria-label="关闭 AI 字幕">×</button></div>
+    <div class="ai-heading"><div><div class="eyebrow">LISTEN · TRANSCRIBE · TRANSLATE</div><h2 id="aiHeading">AI 字幕工作台 <small data-app-version></small></h2></div><button id="aiClose" class="icon-button" type="button" aria-label="关闭 AI 字幕">×</button></div>
     <p id="aiTrackInfo" class="ai-track-info">先选择一条音轨</p>
     <form id="aiForm" autocomplete="off">
       <fieldset class="ai-task-settings"><legend>处理当前音轨</legend>
@@ -248,7 +248,7 @@
     </div>
   </dialog>
   <dialog id="streamDialog" class="stream-dialog" aria-labelledby="streamHeading">
-    <div class="ai-heading"><div><div class="eyebrow">ONE LINK · PRESS PLAY</div><h2 id="streamHeading">在线作品 <small>v0.0.11</small></h2></div><button id="streamClose" class="icon-button" type="button" aria-label="关闭在线作品">×</button></div>
+    <div class="ai-heading"><div><div class="eyebrow">ONE LINK · PRESS PLAY</div><h2 id="streamHeading">在线作品 <small data-app-version></small></h2></div><button id="streamClose" class="icon-button" type="button" aria-label="关闭在线作品">×</button></div>
     <p class="stream-intro">输入公开网页、音频直链或播放列表网址，自动整理作品与音轨。</p>
     <form id="streamForm" class="stream-form">
       <label for="streamUrl">作品网址</label>
@@ -273,6 +273,6 @@
     </div>
     <div class="stream-footer"><button id="streamCancel" class="text-button" type="button" disabled>取消当前任务</button><span class="field-help">目录与进度保存在当前浏览器。</span></div>
   </dialog>
-  <script type="module" src="./js/app.mjs"></script>
+  <script type="module" src="./js/app.mjs?v=0.1.1"></script>
 </body>
 </html>
