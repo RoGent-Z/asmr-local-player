@@ -3,7 +3,7 @@ import { buildTrackPlayback } from './playback-mode.mjs';
 import { createAiWorkbench } from './ai-workbench.mjs';
 import { createBackgroundPicker } from './background.mjs';
 import { createCoverPicker } from './cover-picker.mjs';
-import { createFoliaView } from './folia-view.mjs';
+import { createFoliaView } from './folia-view.mjs?v=0.1.4-folia-minimal';
 import { createLocalWorkbench } from './local-workbench.mjs?v=0.1.4';
 import { displaySourceCues, mergeTranscriptDocuments } from './transcript.mjs';
 import {

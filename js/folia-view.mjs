@@ -10,8 +10,7 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
   const doc=stage.ownerDocument;
   const normal=doc.querySelector('.subtitle-stage');
   const before=stage.querySelector('#foliaBefore'),current=stage.querySelector('#foliaCurrent');
-  const after=stage.querySelector('#foliaAfter'),gap=stage.querySelector('#foliaGap');
-  const exit=stage.querySelector('#foliaExit');
+  const after=stage.querySelector('#foliaAfter');
   const settings=stage.querySelector('#foliaSettings');
   const rateControl=doc.querySelector('#rate');
   const canvas=doc.querySelector('#foliaSceneCanvas');
@@ -70,8 +69,8 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
     if(item.text.length>180)line.dataset.density='long';
     line.title=`${Math.floor(item.start/60)}:${String(Math.floor(item.start%60)).padStart(2,'0')} · 点击跳转`;
     if(state==='active')line.setAttribute('aria-current','true');
-    const voice=doc.createElement('span');voice.className='folia-voice';
-    voice.textContent=item.label||(item.side==='left'?'左声部':item.side==='right'?'右声部':'独白');
+    const voice=item.label||(item.side==='left'?'左声部':item.side==='right'?'右声部':'');
+    if(voice)line.setAttribute('aria-label',`${voice}：${item.text}`);
     const text=doc.createElement('span');text.className='folia-line-text';
     const segmented=state==='active'?segmentFoliaText(item.text):{parts:[item.text],decorated:false};
     if(segmented.decorated){
@@ -79,7 +78,7 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
     }else text.textContent=item.text;
     line.dataset.glyphs=String(segmented.decorated);
     const progress=doc.createElement('span');progress.className='folia-line-progress';progress.setAttribute('aria-hidden','true');
-    line.append(voice,text,progress);
+    line.append(text,progress);
     line.addEventListener('click',()=>{onSeek(item.start);update(item.start,{force:true});onInteraction();});
     return line;
   }
@@ -96,12 +95,10 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
       after.replaceChildren(...frame.after.map(x=>makeLine(x,'after')));
       current.scrollTop=0;
       activeNodes=[...current.children];
-      gap.hidden=!frame.gap;
-      gap.querySelector('span').textContent=frame.after.length?'静听片刻':'这一段字幕已结束';
       stage.dataset.duet=String(new Set(frame.active.map(x=>x.side)).size>1);
       if(focusId){
         const target=[...stage.querySelectorAll('[data-folia-id]')].find(n=>n.dataset.foliaId===focusId&&n.getClientRects().length>0);
-        (target||exit).focus({preventScroll:true});
+        if(target)target.focus({preventScroll:true});else restoreFocus();
       }
       signature=nextSignature;
     }
@@ -126,10 +123,9 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
   }
   const toggle=()=>{
     changePreference(!preferred);
-    if(active)exit.focus({preventScroll:true});else restoreFocus();
+    restoreFocus();
   };
-  const close=()=>changePreference(false,{restore:true});
-  button.addEventListener('click',toggle);exit.addEventListener('click',close);
+  button.addEventListener('click',toggle);
   const toggleSettings=()=>{const expanded=app.classList.toggle('folia-settings-open');settings.setAttribute('aria-expanded',String(expanded));measure();onInteraction();};
   settings.addEventListener('click',toggleSettings);
   const observer=new ResizeObserver(()=>{if(active)measure();});
@@ -143,13 +139,13 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
     setBackground:backdrop.setSource,
     setCues(cues){
       timeline=buildFoliaTimeline(cues);signature='';syncVisibility();
-      if(!timeline.items.length){before.replaceChildren();current.replaceChildren();after.replaceChildren();activeNodes=[];gap.hidden=true;}
+      if(!timeline.items.length){before.replaceChildren();current.replaceChildren();after.replaceChildren();activeNodes=[];}
       update(time);
     },
     setReady(value){ready=Boolean(value);syncVisibility();},
     setPlaying(value){playing=Boolean(value);stage.dataset.playing=String(playing);if(active)update(time);},
     update,isActive:()=>active,
     disable({restoreFocus:restore=false}={}){changePreference(false,{restore});},
-    destroy(){backdrop.destroy();observer.disconnect();cancelAnimationFrame(measurement);window.removeEventListener('resize',measure);motion.removeEventListener('change',motionChanged);scene.destroy();button.removeEventListener('click',toggle);exit.removeEventListener('click',close);settings.removeEventListener('click',toggleSettings);},
+    destroy(){backdrop.destroy();observer.disconnect();cancelAnimationFrame(measurement);window.removeEventListener('resize',measure);motion.removeEventListener('change',motionChanged);scene.destroy();button.removeEventListener('click',toggle);settings.removeEventListener('click',toggleSettings);},
   };
 }

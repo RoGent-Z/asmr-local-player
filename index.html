@@ -9,10 +9,10 @@
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://asmr-player-resolver.navyelf7.chatgpt.site https://kiko-play-niptan.one https://*.kiko-play-niptan.one; media-src 'self' blob: https:; connect-src 'self' blob: https:; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="app-version" content="0.1.4">
-  <meta name="app-build" content="v014-versioning">
+  <meta name="app-build" content="v014-folia-minimal">
   <title>ASMR 原声播放器</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="./styles.css?build=v014-versioning">
+  <link rel="stylesheet" href="./styles.css?build=v014-folia-minimal">
 </head>
 <body>
   <main id="app" class="app">
@@ -96,9 +96,9 @@
 
     <canvas id="foliaSceneCanvas" class="folia-scene" aria-hidden="true" hidden></canvas>
     <section id="foliaStage" class="folia-stage" aria-label="Folia 沉浸字幕" hidden inert>
-      <div class="folia-heading"><span class="folia-wordmark">FOLIA <i>光 · 字 · 境</i></span><div class="folia-actions"><button id="foliaSettings" class="text-button" type="button" aria-expanded="false" aria-controls="listeningControls">听音设置</button><button id="foliaExit" class="text-button" type="button" aria-label="退出 Folia 模式">退出 <span aria-hidden="true">↗</span></button></div></div>
+      <div class="folia-heading"><button id="foliaSettings" class="text-button" type="button" aria-expanded="false" aria-controls="listeningControls">听音设置</button></div>
       <div id="foliaBefore" class="folia-context folia-before" aria-label="上一句"></div>
-      <div class="folia-reading"><div id="foliaCurrent" class="folia-current" aria-label="当前字幕"></div><div id="foliaGap" class="folia-gap" hidden><b aria-hidden="true">· · ·</b><span>静听片刻</span></div></div>
+      <div class="folia-reading"><div id="foliaCurrent" class="folia-current" aria-label="当前字幕"></div></div>
       <div id="foliaAfter" class="folia-context folia-after" aria-label="下一句"></div>
     </section>
 
@@ -282,6 +282,6 @@
     </div>
     <div class="stream-footer"><button id="streamCancel" class="text-button" type="button" disabled>取消当前任务</button><span class="field-help">目录与进度保存在当前浏览器。</span></div>
   </dialog>
-  <script type="module" src="./js/app.mjs?v=0.1.4&build=v014-versioning"></script>
+  <script type="module" src="./js/app.mjs?v=0.1.4&build=v014-folia-minimal"></script>
 </body>
 </html>
