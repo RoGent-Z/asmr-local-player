@@ -1,6 +1,6 @@
-import {createLocalDictionary} from './local-dictionary.mjs?v=0.1.4';
+import {createLocalDictionary} from './local-dictionary.mjs?v=0.1.5';
 import {createLanguageStorage,loadLocalDictionary} from './local-language-store.mjs';
-import {validatePhrasePack,phrasePackSummary} from './local-phrases.mjs?v=0.1.4';
+import {validatePhrasePack,phrasePackSummary} from './local-phrases.mjs?v=0.1.5';
 const storage=createLanguageStorage();let dictionary=null,metadata=null,baseWarning='',loadController=null,generation=0;
 let phrasePack=null,phrasesLoaded=false,phraseRevision=0,phrasePersisted=true;
 async function loadPhrases(){
@@ -29,16 +29,19 @@ self.addEventListener('message',async({data})=>{
     }else if(type==='translate'){
       if(!dictionary)throw new Error('请先准备本地词库');
       if(!Array.isArray(data.cues)||data.cues.length>100000)throw new Error('字幕条目格式无效');
-      const cues=[],unknown=new Set();let matched=0,total=0,phraseHits=0,glossHits=0;
+      const cues=[],unknown=new Set(),scoring=[];let matched=0,total=0,phraseHits=0,glossHits=0,scoringCharacters=0,scoringTruncated=false;
       for(let index=0;index<data.cues.length;index++){
         if(canceled.has(id))throw new Error('翻译已取消');
         const cue=data.cues[index],result=dictionary.translate(cue.text);
         cues.push({...cue,translation:result.text});matched+=result.coverage*Math.max(1,cue.text.length);total+=Math.max(1,cue.text.length);phraseHits+=result.phraseHits||0;glossHits+=result.glossHits||0;
+        if(result.scoring){const item={cueId:String(cue.id??index),scoring:result.scoring},size=JSON.stringify(item).length;
+          if(scoring.length<2000&&scoringCharacters+size<=1024*1024){scoring.push(item);scoringCharacters+=size;}else scoringTruncated=true;
+        }
         for(const word of result.unknown)if(unknown.size<30)unknown.add(word.slice(0,40));
-        if(index%25===0){post(id,'progress',{progress:{phase:'translation',done:index+1,total:data.cues.length}});await new Promise(resolve=>setTimeout(resolve,0));}
+        if(result.scoring||index%25===0){post(id,'progress',{progress:{phase:'translation',done:index+1,total:data.cues.length}});await new Promise(resolve=>setTimeout(resolve,0));}
       }
       if(canceled.has(id))throw new Error('翻译已取消');
-      post(id,'result',{result:{cues,coverage:total?matched/total:1,unknown:[...unknown],phraseHits,glossHits}});
+      post(id,'result',{result:{cues,coverage:total?matched/total:1,unknown:[...unknown],phraseHits,glossHits,...(scoring.length||scoringTruncated?{scoring,scoringTruncated}:{})}});
     }else if(type==='phrase-status'){
       await loadPhrases();post(id,'result',{result:{...phrasePackSummary(phrasePack),persisted:phrasePersisted}});
     }else if(type==='import-phrases'){

@@ -1,4 +1,4 @@
-import {validatePhrasePack,isPackVersion,PACK_DICTIONARY_VERSION} from './local-phrases.mjs?v=0.1.4';
+import {validatePhrasePack,isPackVersion,PACK_DICTIONARY_VERSION} from './local-phrases.mjs?v=0.1.5';
 
 export const TRANSLATION_PACK_ID='rogent-asmr-ja-zh';
 export const TRANSLATION_PACK_REPO='https://github.com/RoGent-Z/asmr-zh-translation-pack';
@@ -11,12 +11,15 @@ export function comparePackVersions(a,b){
 }
 function validateRelease(r){
   if(!r||!isPackVersion(r.version)||!isPackVersion(r.minAppVersion)||typeof r.dictionaryVersion!=='string'||r.dictionaryVersion.length>80||r.url!==`${raw}v${r.version}/packs/asmr-ja-zh.json`||!Number.isSafeInteger(r.bytes)||r.bytes<2||r.bytes>MAX_BYTES||typeof r.sha256!=='string'||!/^[a-f0-9]{64}$/.test(r.sha256)||![r.phrases,r.glosses].every(n=>Number.isSafeInteger(n)&&n>=0&&n<=10000)||r.phrases+r.glosses===0)throw new Error('词组包版本清单无效');
-  return{version:r.version,minAppVersion:r.minAppVersion,dictionaryVersion:r.dictionaryVersion,url:r.url,bytes:r.bytes,sha256:r.sha256,phrases:r.phrases,glosses:r.glosses};
+  if(r.schemaVersion!==undefined&&![1,2].includes(r.schemaVersion)||r.schemaVersion===2&&comparePackVersions(r.minAppVersion,'0.1.5')<0||r.channel!==undefined&&!['stable','experimental'].includes(r.channel))throw new Error('词组包版本清单无效');
+  return{version:r.version,minAppVersion:r.minAppVersion,dictionaryVersion:r.dictionaryVersion,url:r.url,bytes:r.bytes,sha256:r.sha256,phrases:r.phrases,glosses:r.glosses,...(r.schemaVersion!==undefined?{schemaVersion:r.schemaVersion}:{}),...(r.channel?{channel:r.channel}:{})};
 }
 export function validatePackCatalog(c){
   if(c?.kind!=='asmr-translation-pack-catalog'||c.version!==1||c.id!==TRANSLATION_PACK_ID||!Array.isArray(c.releases)||c.releases.length<1||c.releases.length>100)throw new Error('词组包目录无效');
-  const seen=new Set(),releases=c.releases.map(r=>{const clean=validateRelease(r);if(seen.has(clean.version))throw new Error('词组包版本重复');seen.add(clean.version);return clean;}).sort((a,b)=>comparePackVersions(b.version,a.version));
-  return{kind:c.kind,version:1,id:c.id,releases};
+  const seen=new Set(),check=r=>{const clean=validateRelease(r);if(seen.has(clean.version))throw new Error('词组包版本重复');seen.add(clean.version);return clean;},releases=c.releases.map(r=>{const clean=check(r);if(clean.channel==='experimental')throw new Error('实验版本不能放入推荐清单');return clean;}).sort((a,b)=>comparePackVersions(b.version,a.version));
+  if(c.experimentalReleases!==undefined&&(!Array.isArray(c.experimentalReleases)||c.experimentalReleases.length>100))throw new Error('词组包目录无效');
+  const experimentalReleases=c.experimentalReleases?.map(r=>({...check({...r,channel:'experimental'})})).sort((a,b)=>comparePackVersions(b.version,a.version));
+  return{kind:c.kind,version:1,id:c.id,releases,...(experimentalReleases?{experimentalReleases}:{})};
 }
 export function assertPackCompatibility(release,appVersion){
   if(!isPackVersion(appVersion)||comparePackVersions(appVersion,release.minAppVersion)<0)throw new Error(`请先更新网站到 v${release.minAppVersion} 或更新版本`);
@@ -45,6 +48,8 @@ export async function loadTranslationPack(release,{appVersion,...options}={}){
   const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
   if(hash!==r.sha256)throw new Error('词组包完整性校验失败，原包保留');
   const pack=validatePhrasePack(json(bytes));
+  if(pack.version===2){if(comparePackVersions(appVersion,'0.1.5')<0)throw new Error('请先更新网站到 v0.1.5 或更新版本');if((pack.matrix.status==='experimental')!== (r.channel==='experimental'))throw new Error('词组包实验状态与清单不一致，原包保留');}
+  if(r.schemaVersion!==undefined&&pack.version!==r.schemaVersion)throw new Error('词组包格式版本与清单不一致，原包保留');
   if(pack.package?.id!==TRANSLATION_PACK_ID||pack.package.version!==r.version||pack.package.dictionaryVersion!==r.dictionaryVersion||pack.package.license!=='CC-BY-SA-4.0'||pack.entries.length!==r.phrases||(pack.glosses?.length||0)!==r.glosses)throw new Error('词组包内容与版本清单不一致，原包保留');
   options.signal?.throwIfAborted();return pack;
 }

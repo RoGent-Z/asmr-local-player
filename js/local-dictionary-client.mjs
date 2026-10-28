@@ -1,4 +1,4 @@
-export function createLocalDictionaryClient({workerFactory=()=>new Worker(new URL('./local-translation-worker.mjs?v=0.1.4',import.meta.url),{type:'module'})}={}){
+export function createLocalDictionaryClient({workerFactory=()=>new Worker(new URL('./local-translation-worker.mjs?v=0.1.5',import.meta.url),{type:'module'})}={}){
   let worker=null,serial=0,ready=null;const pending=new Map();
   function ensureWorker(){
     if(worker)return worker;worker=workerFactory();

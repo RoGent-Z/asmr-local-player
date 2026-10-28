@@ -1,5 +1,6 @@
 // Dictionary lookup and explicit rules only; no translation inference/model.
-import {normalizePhraseInput,validatePhrasePack} from './local-phrases.mjs?v=0.1.4';
+import {normalizePhraseInput,validatePhrasePack} from './local-phrases.mjs?v=0.1.5';
+import {createMatrixDecoder} from './local-matrix-decoder.mjs?v=0.1.5';
 const JAPANESE=/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u;
 const letters=text=>Array.from(text.matchAll(/[\p{L}\p{N}]/gu)).length;
 const kana=text=>text.replace(/[\u30a1-\u30f6]/g,char=>String.fromCharCode(char.charCodeAt(0)-0x60));
@@ -39,22 +40,23 @@ function bases(text){
 
 export function createLocalDictionary(records,{phrasePack=null}={}){
   if(!Array.isArray(records)||records.length>400000)throw new Error('词库数据格式无效');
-  const index=new Map();let entries=0,maxLength=1;
+  const index=new Map(),allIndex=new Map(),entryRanks=new Map();let entries=0,maxLength=1;
   for(const row of records){
     if(!Array.isArray(row)||!Array.isArray(row[1])||!Array.isArray(row[2])||typeof row[3]!=='string'||!row[3])continue;
-    const entry={id:String(row[0]),translation:row[3].split(/[；;]/u)[0].slice(0,160),rank:Number.isFinite(row[4])?row[4]:999999,pos:typeof row[5]==='string'?row[5]:''};entries++;
+    const entry={id:String(row[0]),translation:row[3].split(/[；;]/u)[0].slice(0,160),rank:Number.isFinite(row[4])?row[4]:999999,pos:typeof row[5]==='string'?row[5]:''};entries++;entryRanks.set(entry.id,entry.rank);
     for(const form of [...row[1],...row[2]]){
       if(typeof form!=='string'||!form||form.length>128)continue;
       const word=normalize(form);maxLength=Math.max(maxLength,Math.min(40,word.length));
       const previous=index.get(word);if(!previous||entry.rank<previous.rank)index.set(word,entry);
+      if(!allIndex.has(word))allIndex.set(word,new Map());allIndex.get(word).set(entry.id,entry);
     }
   }
   for(const phrase of RULES.keys())maxLength=Math.max(maxLength,phrase.length);
-  let phrases=new Map(),glosses=new Map();
-  function setPhrases(pack){const valid=pack?validatePhrasePack(pack):null;phrases=new Map(valid?.entries.map(p=>[p.source,p.target]));glosses=new Map(valid?.glosses?.map(p=>[p.entryId,p.target]));}
+  let phrases=new Map(),glosses=new Map(),matrixRows=new Map(),decode=null;
+  function setPhrases(pack){const valid=pack?validatePhrasePack(pack):null;phrases=new Map(valid?.entries.map(p=>[p.source,p.target]));glosses=new Map(valid?.glosses?.map(p=>[p.entryId,p.target]));matrixRows=new Map(valid?.matrix?.translation.map(r=>[r.source,r.candidates]));decode=valid?.matrix?createMatrixDecoder(valid.matrix,{baseline:translateBaseline,candidatesAt,normalize,rankOf:id=>entryRanks.get(id),glossHas:id=>glosses.has(id)}):null;}
   setPhrases(phrasePack);
 
-  function translate(input){
+  function translateBaseline(input){
     if(typeof input!=='string'||input.length>24000)throw new Error('待翻译文字过长或格式无效');
     const remembered=phrases.get(normalizePhraseInput(input));
     if(remembered){const ending=/[。！？!?]+$/.exec(input)?.[0]||'',text=remembered+(!/[。！？!?]$/.test(remembered)?ending:'');return{text,tokens:[{source:input,translation:text,type:'phrase'}],coverage:1,unknown:[],dictionaryHits:0,ruleHits:0,phraseHits:1};}
@@ -93,5 +95,24 @@ export function createLocalDictionary(records,{phrasePack=null}={}){
     }
     return{text:text.trim(),tokens,coverage:total?Math.max(0,1-tokens.filter(t=>t.type==='unknown').reduce((sum,t)=>sum+letters(t.source),0)/total):1,unknown,dictionaryHits,ruleHits,phraseHits:0,glossHits:tokens.filter(t=>t.entryId&&glosses.has(t.entryId)).length};
   }
+  function candidatesAt(source,normalized,offset,spend){
+    const out=[];
+    function addEntries(word,length,negative=false){
+      const choices=allIndex.get(word);if(!choices)return;
+      for(const entry of choices.values()){
+        spend();const common={length,source:source.slice(offset,offset+length),type:'dictionary',entryId:entry.id,rank:entry.rank,word};
+        out.push({...common,translation:(negative?'不':'')+(glosses.get(entry.id)||entry.translation)});
+        for(const c of matrixRows.get(word)||[]){spend();if(c.entryId===entry.id)out.push({...common,translation:(negative?'不':'')+c.target});}
+      }
+    }
+    for(let length=Math.min(maxLength,source.length-offset);length>0;length--){
+      spend();const word=normalized.slice(offset,offset+length);
+      if(RULES.has(word))out.push({length,source:source.slice(offset,offset+length),translation:RULES.get(word),type:'rule',word});
+      addEntries(word,length);
+      if(length>=3)for(const base of bases(word)){spend();addEntries(base.word,length,base.negative);}
+    }
+    return out;
+  }
+  function translate(input){return decode?decode(input):translateBaseline(input);}
   return{translate,entries,forms:index.size,setPhrases,get phrases(){return phrases.size;},get glosses(){return glosses.size;}};
 }

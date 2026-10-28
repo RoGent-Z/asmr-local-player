@@ -1242,6 +1242,11 @@ button:disabled:hover { transform: none; }
 .local-cue-time { font-size: 10px; color: #9aada2; font-variant-numeric: tabular-nums; }
 .local-cue p { margin: 7px 0; font-size: 13px; line-height: 1.8; overflow-wrap: anywhere; white-space: pre-wrap; }
 .local-chinese { color: #d4e4da; }.local-original { color: #bcb0c1; }
+.local-scoring { margin-top: 10px; border: 1px solid #ffffff18; border-radius: 12px; padding: 0 12px; background: #ffffff03; }
+.local-scoring > summary { cursor: pointer; min-height: 44px; padding: 12px 0; font-size: 12px; color: #cfbfce; }
+.local-scoring > summary:focus-visible { outline: 2px solid var(--accent-soft); outline-offset: 3px; border-radius: 6px; }
+.local-scoring-row { border-top: 1px solid #ffffff12; padding: 6px 0; }
+.local-cue .local-scoring .field-help { color: #afa4b1; font-size: 11px; }
 .local-result-actions { margin-top: 14px; }
 @media(max-width:600px){
   .local-dialog { width: calc(100vw - 16px); max-width: calc(100vw - 16px); }

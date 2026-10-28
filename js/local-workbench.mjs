@@ -1,5 +1,6 @@
-import {createLocalDictionaryClient} from './local-dictionary-client.mjs?v=0.1.4';
-import {fetchPackCatalog,loadTranslationPack,comparePackVersions,assertPackCompatibility,TRANSLATION_PACK_ID} from './translation-pack-catalog.mjs?v=0.1.4';
+import {createLocalDictionaryClient} from './local-dictionary-client.mjs?v=0.1.5';
+import {mergeScoring,exportLocalResult,scoringDetails} from './local-scoring.mjs?v=0.1.5';
+import {fetchPackCatalog,loadTranslationPack,comparePackVersions,assertPackCompatibility,TRANSLATION_PACK_ID} from './translation-pack-catalog.mjs?v=0.1.5';
 import {createLocalAsr} from './local-asr.mjs';
 import {makeTranscriptDocument,mergeTranscriptDocuments,displaySourceCues,exportTimedText} from './transcript.mjs';
 const ids=['localDialog','localClose','localPrepare','localClearCache','localDictionaryStatus','localAsrStatus','localTrackName','localForm','localTaskMode','localSource','localStart','localCancel','localProgress','localStatus','localDisplayMode','localCoverage','localPreview','localApply','localRestore','localExportVtt','localExportSrt','localExportJson','localPhraseImport','localPhraseFile','localPhraseStatus','localPhraseRemove','localPackInstall','localPackCheck','localPackVersion','localPackStatus'];
@@ -8,7 +9,7 @@ const canceled=()=>new DOMException('任务已取消','AbortError');
 
 export function createLocalWorkbench({getContext,onApply,onRestore,onOpenChange=()=>{}}){
   const el=Object.fromEntries(ids.map(id=>[id,document.getElementById(id)])),entry=document.querySelector('#localTranslateButton');
-  let dictionary=createLocalDictionaryClient(),metadata=null,asr=null,controller=null,serial=0,busy=false,documentResult=null,summary=null,taskTrack=null;
+  let dictionary=createLocalDictionaryClient(),metadata=null,asr=null,controller=null,serial=0,busy=false,documentResult=null,summary=null,taskTrack=null,scoring={};
   const results=new Map();let viewTrack=null,clearingCache=false,importingPhrases=false;
   let packCatalog=null,installedPackage=null;
   const appVersion=document.querySelector('meta[name="app-version"]').content;
@@ -23,14 +24,15 @@ export function createLocalWorkbench({getContext,onApply,onRestore,onOpenChange=
     installedPackage=info.package||null;
     const has=info.phrases||info.glosses;
     el.localPhraseStatus.textContent=has?`${installedPackage?'已安装 v'+installedPackage.version:'本机导入 · 未标版本'}：${info.phrases||0} 条精确短语 · ${info.glosses||0} 项词义偏好 · ${info.persisted?'已保存在此浏览器':'本次可用，未能缓存'}`:'未安装可选词组包，当前使用基础词库。';
+    if(info.matrix)el.localPhraseStatus.textContent+=` · ${info.matrix.status==='experimental'?'实验矩阵':'矩阵'}：${info.matrix.rows} 词形 / ${info.matrix.candidates} 候选 / ${info.matrix.transitions} 搭配；证据不足时沿用原词库结果`;
     renderPackCatalog();
   }
   function renderPackCatalog(){
     if(!packCatalog)return;const selected=el.localPackVersion.value;
-    el.localPackVersion.replaceChildren(new Option(`最新版 · v${packCatalog.releases[0].version}`,'latest'));
-    for(const r of packCatalog.releases){const option=new Option(`v${r.version} · ${r.glosses} 项词义`,r.version);try{assertPackCompatibility(r,appVersion);}catch{option.disabled=true;option.textContent+=` · 需更新网站`;}el.localPackVersion.append(option);}
+    el.localPackVersion.replaceChildren(new Option(`推荐稳定版 · v${packCatalog.releases[0].version}`,'latest'));
+    for(const r of [...packCatalog.releases,...packCatalog.experimentalReleases||[]]){const option=new Option(`${r.channel==='experimental'?'实验 · ':''}v${r.version} · ${r.glosses} 项词义`,r.version);try{assertPackCompatibility(r,appVersion);}catch{option.disabled=true;option.textContent+=` · 需更新网站`;}el.localPackVersion.append(option);}
     if([...el.localPackVersion.options].some(o=>o.value===selected&&!o.disabled))el.localPackVersion.value=selected;
-    const latest=packCatalog.releases[0];let text=`最新版 v${latest.version} · ${latest.glosses} 项词义偏好`;
+    const latest=packCatalog.releases[0];let text=`推荐稳定版 v${latest.version} · ${latest.glosses} 项词义偏好`;
     if(installedPackage?.id===TRANSLATION_PACK_ID){const compared=comparePackVersions(latest.version,installedPackage.version);text+=compared>0?' · 有可用更新':compared===0?' · 已是最新版':' · 本机版本较新';}
     try{assertPackCompatibility(latest,appVersion);}catch(error){text+=` · ${error.message}`;}el.localPackStatus.textContent=text;
   }
@@ -68,20 +70,22 @@ export function createLocalWorkbench({getContext,onApply,onRestore,onOpenChange=
     return ready;
   }
   function renderResult(){
-    el.localPreview.replaceChildren();const sources=documentResult?.sources||[],cues=sources.flatMap(source=>source.cues.map(cue=>({...cue,label:source.label})));
+    el.localPreview.replaceChildren();const sources=documentResult?.sources||[],cues=sources.flatMap(source=>source.cues.map(cue=>({...cue,label:source.label,sourceId:source.id})));
     for(const cue of cues.slice(0,8)){
       const row=document.createElement('article');row.className='local-cue';
       const time=document.createElement('span');time.className='local-cue-time';time.textContent=`${Math.floor(cue.start/60)}:${String(Math.floor(cue.start%60)).padStart(2,'0')}${cue.label?' · '+cue.label:''}`;
       const original=document.createElement('p');original.className='local-original';original.textContent=cue.text;
       const translated=document.createElement('p');translated.className='local-chinese';translated.textContent=cue.translation||'未匹配，保留原文';row.append(time,original,translated);el.localPreview.append(row);
+      const diagnostic=scoring[cue.sourceId]?.cues.find(c=>c.cueId===cue.id);if(diagnostic)row.append(scoringDetails(diagnostic.scoring));
     }
     el.localCoverage.textContent=cues.length?`当前结果 ${cues.length} 条字幕${summary?` · 本次翻译匹配文字约 ${Math.round(summary.coverage*100)}%`:''}。${summary?.unknown?.length?'未匹配内容保留原文：'+summary.unknown.slice(0,8).join('、'):'词库拼接不保证语序和多义词正确。'}`:'尚未生成结果。';
+    if(Object.values(scoring).some(s=>s.truncated))el.localCoverage.textContent+=' 评分明细达到保存上限，字幕全文仍保留。';
     for(const id of ['localApply','localExportVtt','localExportSrt','localExportJson'])el[id].disabled=!cues.length;
   }
   function apply(){
     if(!documentResult||context()?.trackKey!==documentResult.trackKey){status('结果对应的音轨已改变，请回到原音轨或重新处理。',true);return;}
     results.delete(documentResult.trackKey);
-    results.set(documentResult.trackKey,{document:documentResult,summary,displayMode:el.localDisplayMode.value,source:el.localSource.value});
+    results.set(documentResult.trackKey,{document:documentResult,summary,scoring,displayMode:el.localDisplayMode.value,source:el.localSource.value});
     while(results.size>12)results.delete(results.keys().next().value);
     onApply(documentResult,el.localDisplayMode.value);
   }
@@ -102,7 +106,7 @@ export function createLocalWorkbench({getContext,onApply,onRestore,onOpenChange=
     if(audio&&selected.some(source=>!['mp3','wav'].includes(source.audioFormat||/\.([a-z0-9]+)$/i.exec(source.name||'')?.[1]?.toLowerCase()||'wav'))){status('本地听写目前支持 MP3／WAV，请切换格式或使用已有字幕。',true);return;}
     const run=++serial;controller=new AbortController();const signal=controller.signal;taskTrack=current.trackKey;setBusy(true);el.localDialog.dataset.state='running';el.localProgress.value=0;
     try{
-      const ready=await prepare(signal,run,audio),sources=[];let coverage=0,phraseHits=0,glossHits=0;const unknown=new Set();
+      const ready=await prepare(signal,run,audio),sources=[],diagnostics={};let coverage=0,phraseHits=0,glossHits=0;const unknown=new Set();
       for(const source of selected){
         const cues=audio?await asr.transcribe(source,{signal,onProgress:value=>progress(value,run)}):source.cues;
         if(run!==serial||signal.aborted)throw canceled();
@@ -110,10 +114,11 @@ export function createLocalWorkbench({getContext,onApply,onRestore,onOpenChange=
         const translated=await dictionary.translate(cues,{signal,onProgress:value=>progress(value,run)});
         coverage+=translated.coverage;phraseHits+=translated.phraseHits||0;glossHits+=translated.glossHits||0;for(const word of translated.unknown)unknown.add(word);
         sources.push({id:source.id,side:source.side,label:source.label,cues:translated.cues});
+        diagnostics[source.id]={cues:translated.scoring||[],truncated:Boolean(translated.scoringTruncated)};
       }
       if(run!==serial||signal.aborted||context()?.trackKey!==current.trackKey)throw canceled();
       const previous=results.get(current.trackKey)?.document||makeTranscriptDocument(current);
-      documentResult=mergeTranscriptDocuments(previous,{trackKey:current.trackKey,sources});summary={coverage:coverage/selected.length,unknown:[...unknown]};renderResult();apply();
+      documentResult=mergeTranscriptDocuments(previous,{trackKey:current.trackKey,sources});scoring=mergeScoring(results.get(current.trackKey)?.scoring,diagnostics,documentResult);summary={coverage:coverage/selected.length,unknown:[...unknown]};renderResult();apply();
       el.localDialog.dataset.state='done';el.localProgress.value=1;status(`本地翻译已完成并应用到播放器。${phraseHits||glossHits?`本机学习包命中 ${phraseHits} 条短语、${glossHits} 处词义偏好。`:''}${ready.warning||'译文来自词库和规则，未调用 AI 翻译接口。'}`);
     }catch(error){if(run===serial){el.localDialog.dataset.state=signal.aborted?'canceled':'error';status(signal.aborted?'任务已取消，播放器保留原有字幕。':error.message||'本地翻译失败',!signal.aborted);}}
     finally{if(run===serial){controller=null;setBusy(false);}}
@@ -146,7 +151,7 @@ export function createLocalWorkbench({getContext,onApply,onRestore,onOpenChange=
     const current=context();if(busy&&taskTrack!==null&&current?.trackKey!==taskTrack)cancel();
     const changed=viewTrack!==(current?.trackKey||null);viewTrack=current?.trackKey||null;
     const saved=results.get(viewTrack);
-    if(documentResult?.trackKey!==viewTrack){documentResult=saved?.document||null;summary=saved?.summary||null;renderResult();}
+    if(documentResult?.trackKey!==viewTrack){documentResult=saved?.document||null;summary=saved?.summary||null;scoring=saved?.scoring||{};renderResult();}
     if(changed&&!busy){
       el.localDialog.dataset.state=documentResult?'done':'idle';el.localProgress.value=documentResult?1:0;
       status(documentResult?'已恢复本页面中的本地翻译结果，可继续应用或导出。':'准备就绪，选择处理方式后开始。');
@@ -168,7 +173,7 @@ export function createLocalWorkbench({getContext,onApply,onRestore,onOpenChange=
     try{
       packCatalog=await fetchPackCatalog({signal});if(run!==serial)return;renderPackCatalog();
       if(install){
-        const release=selected==='latest'?packCatalog.releases[0]:packCatalog.releases.find(r=>r.version===selected);if(!release)throw new Error('所选版本已不在目录，请重新检查更新');
+        const release=selected==='latest'?packCatalog.releases[0]:[...packCatalog.releases,...packCatalog.experimentalReleases||[]].find(r=>r.version===selected);if(!release)throw new Error('所选版本已不在目录，请重新检查更新');
         const pack=await loadTranslationPack(release,{appVersion,signal,onProgress:({done,total})=>{if(run!==serial){return;}el.localProgress.value=done/total;status(`正在下载词组包 v${release.version} · ${Math.round(done/1024)} / ${Math.round(total/1024)} KiB…`);}});
         if(run!==serial||signal.aborted)return;const result=await dictionary.importPhrases(pack);if(run!==serial)return;renderPackInfo(result);el.localProgress.value=1;
         status(`词组包 v${release.version} 已安装。${result.persisted?'刷新后自动恢复。':'本次可用，浏览器未能保存；刷新后需重新安装。'}下次翻译使用此包，已有字幕结果不变。`);
@@ -197,7 +202,7 @@ export function createLocalWorkbench({getContext,onApply,onRestore,onOpenChange=
   function close(){el.localDialog.close();}
   function download(format){
     if(!documentResult)return;
-    const documents=format==='json'?[{content:JSON.stringify({...documentResult,translationMethod:'dictionary-v1'},null,2),name:'all',mime:'application/json'}]:documentResult.sources.map((source,index)=>({content:exportTimedText(displaySourceCues(source,el.localDisplayMode.value),format),name:`source-${index+1}`,mime:'text/plain'}));
+    const documents=format==='json'?[{content:exportLocalResult(documentResult,scoring),name:'all',mime:'application/json'}]:documentResult.sources.map((source,index)=>({content:exportTimedText(displaySourceCues(source,el.localDisplayMode.value),format),name:`source-${index+1}`,mime:'text/plain'}));
     for(const item of documents){const url=URL.createObjectURL(new Blob([item.content],{type:item.mime+';charset=utf-8'})),link=document.createElement('a');link.href=url;link.download=`asmr-local-ja-${item.name}.${format}`;link.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
   }
   entry.addEventListener('click',open);el.localClose.addEventListener('click',close);el.localForm.addEventListener('submit',run);el.localCancel.addEventListener('click',()=>cancel());el.localPrepare.addEventListener('click',prepareOnly);el.localClearCache.addEventListener('click',clearCache);
