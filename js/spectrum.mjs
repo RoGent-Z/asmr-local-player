@@ -34,8 +34,9 @@ export function spectrumLevel(value, active) {
 
 function prepareCanvas(canvas) {
   if (!canvas) return null;
-  const dpr = Math.max(1, window.devicePixelRatio || 1);
   const rect = canvas.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return null;
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
   const width = Math.max(1, Math.round(rect.width * dpr));
   const height = Math.max(1, Math.round(rect.height * dpr));
   if (canvas.width !== width || canvas.height !== height) {
@@ -143,11 +144,14 @@ function drawRadial(canvas, values, active, color, time, semantic, timbre) {
   }
 
   context.shadowBlur = 0;
-  context.globalAlpha = active ? 0.18 : 0.09 + breath * 0.04;
-  context.lineWidth = 1;
-  context.beginPath();
-  context.arc(centerX, centerY, baseRadius - 4, 0, Math.PI * 2);
-  context.stroke();
+  const innerRadius = baseRadius - 4;
+  if (innerRadius > 0) {
+    context.globalAlpha = active ? 0.18 : 0.09 + breath * 0.04;
+    context.lineWidth = 1;
+    context.beginPath();
+    context.arc(centerX, centerY, innerRadius, 0, Math.PI * 2);
+    context.stroke();
+  }
   context.globalAlpha = 1;
 }
 

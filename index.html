@@ -8,11 +8,11 @@
   <meta name="stream-resolver" content="https://asmr-player-resolver.navyelf7.chatgpt.site">
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://asmr-player-resolver.navyelf7.chatgpt.site https://kiko-play-niptan.one https://*.kiko-play-niptan.one; media-src 'self' blob: https:; connect-src 'self' blob: https:; object-src 'none'; base-uri 'none'; form-action 'none'">
-  <meta name="app-version" content="0.1.5">
-  <meta name="app-build" content="v015-matrix">
+  <meta name="app-version" content="0.1.6">
+  <meta name="app-build" content="v016-signal">
   <title>ASMR 原声播放器</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="./styles.css?build=v015-matrix">
+  <link rel="stylesheet" href="./styles.css?build=v016-signal">
 </head>
 <body>
   <main id="app" class="app">
@@ -25,7 +25,7 @@
 
     <header class="topbar">
       <button id="menuButton" class="icon-button" type="button"
-        aria-label="打开作品库" aria-expanded="false">☰</button>
+        aria-label="打开作品库" aria-expanded="false"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 4v16m5-16v16m4-16 4 16m2-14 2 12"/></svg></button>
       <div class="now-playing">
         <div id="workTitle" class="work-title">本地 ASMR 播放器</div>
         <div id="trackTitle" class="track-title">正在扫描本地作品…</div>
@@ -48,15 +48,35 @@
     <input id="folderInput" class="file-input" type="file" webkitdirectory multiple aria-label="选择本机曲库文件夹" tabindex="-1">
     <input id="filesInput" class="file-input" type="file" multiple accept=".mp3,.wav,.vtt,.srt,.ass,.ssa,.lrc,.jpg,.jpeg,.png,.webp,.avif,.gif" aria-label="选择音频、字幕和图片文件" tabindex="-1">
     <section id="libraryWelcome" class="library-welcome" aria-label="添加作品" hidden>
-      <div class="eyebrow">YOUR FILES · YOUR PLAYER</div>
-      <h1>把声音，留在自己这里。</h1>
-      <p>保留双耳细节，听见每一个人。<br>在线作品 · 本机曲库 · 本地日语翻译</p>
-      <div class="welcome-actions" role="group" aria-label="添加作品的方式">
+      <div class="welcome-sheet">
+        <div class="welcome-hero">
+          <div class="welcome-copy">
+            <h1><span>原声</span><strong>放送室</strong></h1>
+            <p class="welcome-description">打开本机曲库或添加在线音声。<br>双耳播放，同步字幕。</p>
+          </div>
+          <div class="welcome-art" aria-hidden="true">
+            <div class="welcome-disc"></div>
+            <div class="welcome-wave">
+              <i style="--level:8%"></i><i style="--level:20%"></i><i style="--level:13%"></i>
+              <i style="--level:34%"></i><i style="--level:63%"></i><i style="--level:92%"></i>
+              <i style="--level:49%"></i><i style="--level:23%"></i><i style="--level:34%"></i>
+              <i style="--level:15%"></i><i style="--level:42%"></i><i style="--level:78%"></i>
+              <i style="--level:100%"></i><i style="--level:53%"></i><i style="--level:25%"></i>
+              <i style="--level:38%"></i><i style="--level:62%"></i><i style="--level:34%"></i>
+              <i style="--level:15%"></i><i style="--level:23%"></i><i style="--level:9%"></i>
+            </div>
+          </div>
+        </div>
+        <div class="welcome-import">
+          <h2>添加作品</h2>
+          <div class="welcome-actions" role="group" aria-label="添加作品的方式">
         <button id="chooseStreamButton" class="text-button welcome-action choose-stream-button" type="button" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m10 13 4-4M8 16l-1 1a3.5 3.5 0 0 1-5-5l4-4a3.5 3.5 0 0 1 5 0m2 8a3.5 3.5 0 0 0 5 0l4-4a3.5 3.5 0 0 0-5-5l-1 1"/></svg><span>添加作品网址</span></button>
         <button id="chooseFolderButton" class="text-button welcome-action choose-folder-button" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 7V5a1 1 0 0 1 1-1h5l2 3h9a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7Z"/></svg><span>选择曲库文件夹</span></button>
         <button id="chooseFilesButton" class="text-button welcome-action choose-files-button" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8l-5-5Zm0 0v5h5M10 17v-5l5-1v5"/><ellipse cx="8.5" cy="17.5" rx="1.5" ry="1"/><ellipse cx="13.5" cy="16.5" rx="1.5" ry="1"/></svg><span>选择音频与文件</span></button>
+          </div>
+          <p id="importStatus" class="import-status" role="status">支持 MP3、WAV 和字幕文件。作品目录会保存在当前浏览器。</p>
+        </div>
       </div>
-      <p id="importStatus" class="import-status" role="status">网址自动整理为作品；本机音频、字幕和图片留在设备内。<br>作品目录与本机曲库可在当前浏览器恢复。</p>
     </section>
 
     <div id="drawerScrim" class="drawer-scrim" aria-hidden="true"></div>
@@ -282,6 +302,6 @@
     </div>
     <div class="stream-footer"><button id="streamCancel" class="text-button" type="button" disabled>取消当前任务</button><span class="field-help">目录与进度保存在当前浏览器。</span></div>
   </dialog>
-  <script type="module" src="./js/app.mjs?v=0.1.5&build=v015-matrix"></script>
+  <script type="module" src="./js/app.mjs?v=0.1.6&amp;build=v016-signal"></script>
 </body>
 </html>

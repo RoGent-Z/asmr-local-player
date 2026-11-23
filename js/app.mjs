@@ -33,7 +33,7 @@ import {
   semanticFrameAt,
   trackProfileKey,
 } from './semantic-visuals.mjs';
-import { createSpectrumRenderer } from './spectrum.mjs';
+import { createSpectrumRenderer } from './spectrum.mjs?v=0.1.6';
 import { assignSourceIdentity, decodeSubtitleBytes, parseSubtitle } from './subtitles.mjs';
 
 const appVersion = document.querySelector('meta[name="app-version"]').content;
