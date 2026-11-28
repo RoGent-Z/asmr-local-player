@@ -64,8 +64,8 @@ export function createAiWorkbench({ getContext, onApply, onRestore, onOpenChange
     el.aiStart.textContent = audio ? '开始／续做识别与翻译' : '开始／续做台本翻译';
     const host = (value) => { try { return new URL(value).host; } catch { return '尚未填写的接口'; } };
     el.aiDestination.textContent = audio
-      ? `开始后，当前音轨的音频分片发送到 ${host(el.asrEndpoint.value)}，台本发送到 ${host(el.translationEndpoint.value)}。服务商可能计费；取消不会撤销已经发送的请求。`
-      : `开始后，当前音轨的台本发送到 ${host(el.translationEndpoint.value)}，不发送音频。服务商可能计费。`;
+      ? `音频发往 ${host(el.asrEndpoint.value)}，台本发往 ${host(el.translationEndpoint.value)}。`
+      : `台本发往 ${host(el.translationEndpoint.value)}，不发送音频。`;
   }
 
   function setBusy(value) {

@@ -1,7 +1,7 @@
 import {buildFoliaTimeline, foliaFrameAt} from './folia-timeline.mjs';
-import {createFoliaScene} from './folia-scene.mjs';
+import {createFoliaScene} from './folia-scene.mjs?v=0.1.7-velvet';
 import {segmentFoliaText,foliaGlyphFrame} from './folia-glyphs.mjs';
-import {createFoliaBackdrop,DEFAULT_FOLIA_PALETTE} from './folia-theme.mjs';
+import {createFoliaBackdrop,DEFAULT_FOLIA_PALETTE,deriveUiTheme} from './folia-theme.mjs?v=0.1.7-velvet';
 
 const PREFERENCE_KEY='asmr-player:folia:v1';
 
@@ -20,8 +20,26 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
   let preferred=false,ready=false,active=false,time=0,signature='',playing=false;
   let timeline=buildFoliaTimeline([]),activeNodes=[],measurement=0;
   let palette=DEFAULT_FOLIA_PALETTE,hasBackground=false;
+  const applyAdaptiveUi=(nextPalette,withImage)=>{
+    const ui=deriveUiTheme(nextPalette);
+    const root=doc.documentElement;
+    if(root?.style){
+      root.style.setProperty('--ui-bg',ui.background);
+      root.style.setProperty('--ui-deep',ui.deep);
+      root.style.setProperty('--ui-surface',ui.surface);
+      root.style.setProperty('--ui-surface-hi',ui.surfaceHi);
+      root.style.setProperty('--ui-accent',ui.accent);
+      root.style.setProperty('--ui-light',ui.light);
+      root.style.setProperty('--ui-echo',ui.echo);
+      root.style.setProperty('--ui-fill',ui.fill);
+      root.style.setProperty('--ui-fill-deep',ui.fillDeep);
+      root.dataset.uiAdaptive=withImage?'image':'default';
+    }
+  };
+  applyAdaptiveUi(palette,false);
   const backdrop=createFoliaBackdrop({onChange:state=>{
     palette=state.palette;hasBackground=state.hasBackground;
+    applyAdaptiveUi(palette,hasBackground);
     app.classList.toggle('folia-image',hasBackground);app.dataset.foliaTheme=state.status;
     for(const key of ['accent','light','echo','star','deep'])app.style.setProperty(`--folia-${key==='accent'?'tint':key}`,palette[key]);
     palette.echo.split(',').map(Number).forEach((value,index)=>app.style.setProperty(`--folia-glyph-${['r','g','b'][index]}`,String(Math.round(value*.65+255*.25))));

@@ -1,10 +1,15 @@
 export const DEFAULT_FOLIA_PALETTE=Object.freeze({
-  background:'2, 15, 15',deep:'2, 24, 22',accent:'68, 214, 173',light:'177, 255, 221',
-  grid:'91, 220, 173',dust:'193, 251, 218',echo:'141, 238, 199',star:'216, 255, 232',
+  background:'16, 11, 20',deep:'28, 18, 34',accent:'220, 120, 154',light:'252, 234, 241',
+  grid:'198, 116, 150',dust:'248, 212, 226',echo:'224, 156, 182',star:'255, 240, 246',
 });
 const mix=(color,target,amount)=>color.map((value,index)=>Math.round(value+(target[index]-value)*amount));
 const white=[255,255,255],black=[0,0,0];
 const rgb=color=>color.join(', ');
+const parseRgb=value=>String(value).split(',').map(part=>Math.min(255,Math.max(0,Math.round(Number(part)||0))));
+const relativeLuminance=([r,g,b])=>{
+  const lin=channel=>{const c=channel/255;return c<=0.03928?c/12.92:((c+0.055)/1.055)**2.4;};
+  return 0.2126*lin(r)+0.7152*lin(g)+0.0722*lin(b);
+};
 const paletteFrom=color=>Object.freeze({
   background:rgb(mix(color,black,.94)),deep:rgb(mix(color,black,.88)),
   accent:rgb(mix(color,white,.16)),light:rgb(mix(color,white,.86)),
@@ -12,6 +17,27 @@ const paletteFrom=color=>Object.freeze({
   echo:rgb(mix(color,white,.52)),star:rgb(mix(color,white,.92)),
 });
 const NEUTRAL=paletteFrom([145,145,145]);
+
+/** Derive contrast-safe adaptive UI tokens from any Folia/background palette. */
+export function deriveUiTheme(input){
+  const palette=normalizeFoliaPalette(input);
+  const bg=parseRgb(palette.background),deep=parseRgb(palette.deep),accent=parseRgb(palette.accent);
+  const surface=mix(deep,black,.12);
+  const surfaceHi=mix(deep,accent,.12);
+  // Keep primary button fill rich & readable under light ivory text regardless of artwork hue.
+  let fill=mix(accent,black,.18);
+  const lum=relativeLuminance(fill);
+  if(lum>0.145){
+    const scale=Math.sqrt(0.145/lum);
+    fill=fill.map(channel=>Math.round(channel*scale));
+  }
+  const fillDeep=mix(fill,black,.24);
+  return Object.freeze({
+    background:rgb(bg),deep:rgb(deep),surface:rgb(surface),surfaceHi:rgb(surfaceHi),
+    accent:palette.accent,light:palette.light,echo:palette.echo,
+    fill:rgb(fill),fillDeep:rgb(fillDeep),
+  });
+}
 
 /** Dominant visible chromatic bucket; grayscale art retains neutral light. */
 export function deriveFoliaTheme(imageData){

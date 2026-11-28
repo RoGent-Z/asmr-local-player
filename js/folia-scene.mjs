@@ -38,7 +38,7 @@ function drawScene(context, frame, width, height, ratioX, ratioY) {
   const background = context.createLinearGradient(0, 0, width * 0.8, height);
   background.addColorStop(0, rgb(palette.deep));
   background.addColorStop(0.62, rgb(palette.background));
-  background.addColorStop(1, 'rgb(1, 11, 13)');
+  background.addColorStop(1, 'rgb(10, 7, 13)');
   context.fillStyle = background;
   context.fillRect(0, 0, width, height);
   }
@@ -60,8 +60,8 @@ function drawScene(context, frame, width, height, ratioX, ratioY) {
     polygon(context, tile.points);
     context.fillStyle = rgb(palette.grid, tile.alpha * (frame.hasBackground ? 0.5 : 1));
     context.fill();
-    context.strokeStyle = rgb(palette.light, tile.alpha * 0.32);
-    context.lineWidth = 0.65;
+    context.strokeStyle = rgb(palette.light, tile.alpha * 0.36);
+    context.lineWidth = 0.6;
     context.stroke();
   }
 
@@ -115,19 +115,19 @@ function drawScene(context, frame, width, height, ratioX, ratioY) {
     context.translate(star.x, star.y);
     context.rotate(star.rotate * DEG);
     context.strokeStyle = rgb(palette.star, star.alpha);
-    context.lineWidth = 0.8;
+    context.lineWidth = 0.85;
     context.beginPath();
-    context.moveTo(-star.radius, 0);
-    context.lineTo(star.radius, 0);
-    context.moveTo(0, -star.radius * 1.45);
-    context.lineTo(0, star.radius * 1.45);
+    context.moveTo(-star.radius * 1.05, 0);
+    context.lineTo(star.radius * 1.05, 0);
+    context.moveTo(0, -star.radius * 1.65);
+    context.lineTo(0, star.radius * 1.65);
     context.stroke();
-    context.strokeStyle = rgb(palette.star, star.alpha * 0.42);
+    context.strokeStyle = rgb(palette.star, star.alpha * 0.44);
     context.beginPath();
-    context.moveTo(-star.radius * 0.45, -star.radius * 0.45);
-    context.lineTo(star.radius * 0.45, star.radius * 0.45);
-    context.moveTo(star.radius * 0.45, -star.radius * 0.45);
-    context.lineTo(-star.radius * 0.45, star.radius * 0.45);
+    context.moveTo(-star.radius * 0.42, -star.radius * 0.42);
+    context.lineTo(star.radius * 0.42, star.radius * 0.42);
+    context.moveTo(star.radius * 0.42, -star.radius * 0.42);
+    context.lineTo(-star.radius * 0.42, star.radius * 0.42);
     context.stroke();
     context.restore();
   }
@@ -135,9 +135,9 @@ function drawScene(context, frame, width, height, ratioX, ratioY) {
   context.globalCompositeOperation = 'source-over';
 
   const vignette = context.createRadialGradient(width * 0.49, height * 0.45, Math.min(width, height) * 0.12, width * 0.5, height * 0.5, Math.hypot(width, height) * 0.64);
-  vignette.addColorStop(0, 'rgba(0, 5, 7, 0)');
-  vignette.addColorStop(0.55, 'rgba(0, 5, 7, 0.06)');
-  vignette.addColorStop(1, 'rgba(0, 5, 7, 0.72)');
+  vignette.addColorStop(0, 'rgba(8, 5, 11, 0)');
+  vignette.addColorStop(0.55, 'rgba(8, 5, 11, 0.08)');
+  vignette.addColorStop(1, 'rgba(8, 5, 11, 0.74)');
   context.fillStyle = vignette;
   context.fillRect(0, 0, width, height);
 }

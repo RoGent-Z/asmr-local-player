@@ -1,9 +1,9 @@
 import { sourceToPresentation } from './alignment.mjs';
 import { buildTrackPlayback } from './playback-mode.mjs';
-import { createAiWorkbench } from './ai-workbench.mjs';
-import { createBackgroundPicker } from './background.mjs';
-import { createCoverPicker } from './cover-picker.mjs';
-import { createFoliaView } from './folia-view.mjs?v=0.1.4-folia-minimal';
+import { createAiWorkbench } from './ai-workbench.mjs?v=0.1.7';
+import { createBackgroundPicker } from './background.mjs?v=0.1.7';
+import { createCoverPicker } from './cover-picker.mjs?v=0.1.7';
+import { createFoliaView } from './folia-view.mjs?v=0.1.7-velvet';
 import { createLocalWorkbench } from './local-workbench.mjs?v=0.1.5';
 import { displaySourceCues, mergeTranscriptDocuments } from './transcript.mjs';
 import {
@@ -33,7 +33,7 @@ import {
   semanticFrameAt,
   trackProfileKey,
 } from './semantic-visuals.mjs';
-import { createSpectrumRenderer } from './spectrum.mjs?v=0.1.6';
+import { createSpectrumRenderer } from './spectrum.mjs?v=0.1.7';
 import { assignSourceIdentity, decodeSubtitleBytes, parseSubtitle } from './subtitles.mjs';
 
 const appVersion = document.querySelector('meta[name="app-version"]').content;
@@ -689,7 +689,7 @@ function createWorkCard(work, candidateWorkIndex) {
   const nameRow = document.createElement('div'); nameRow.className = 'work-name-row'; nameRow.append(name);
   if (isOnlineWork(work)) {
     const badge = document.createElement('span'); badge.className = 'work-cloud-badge'; badge.title = '在线作品';
-    badge.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="在线作品" focusable="false"><title>在线作品</title><path d="M7 19h11a4 4 0 0 0 .6-8A6.5 6.5 0 0 0 6 9.5 4.8 4.8 0 0 0 7 19Z"/></svg>';
+    badge.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="在线作品" focusable="false"><title>在线作品</title><path d="M7 19h11a4 4 0 0 0 .6-8A6.5 6.5 0 0 0 6 9.5 4.8 4.8 0 0 0 7 19Z"/></svg>';
     nameRow.append(badge);
   }
   heading.append(nameRow, meta);
@@ -749,7 +749,7 @@ function createWorkCard(work, candidateWorkIndex) {
   surface.className = 'cover-button-surface';
   surface.setAttribute('aria-hidden', 'true');
   // Static local icon; filenames and other library text never enter HTML markup.
-  surface.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M10 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v5"/><circle cx="8" cy="9" r="1.5"/><path d="m3 17 5-5 4 4 3-3M14 21l.7-3.3 5.6-5.6a1.4 1.4 0 0 1 2 2l-5.6 5.6L14 21ZM19 14l2 2"/></svg>';
+  surface.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M10 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v5"/><circle cx="8" cy="9" r="1.5"/><path d="m3 17 5-5 4 4 3-3M14 21l.7-3.3 5.6-5.6a1.4 1.4 0 0 1 2 2l-5.6 5.6L14 21ZM19 14l2 2"/></svg>';
   chooseCover.append(surface);
   chooseCover.addEventListener('click', () => coverPicker.open(work, chooseCover));
   thumbnail.append(chooseCover);
@@ -1123,10 +1123,10 @@ async function saveLocalLibrary(next,directoryHandle) {
       if (request === cacheSaveRequest && !controller.signal.aborted) setCacheStatus(`正在保存本机缓存：${progress.completed ?? 0}/${progress.total ?? next.cacheFiles.length} 个文件，播放可继续…`);
     }});
     if (request !== cacheSaveRequest || controller.signal.aborted) return;
-    if (result.status === 'saved') setCacheStatus(result.mode === 'handle' ? '已记住曲库目录。下次在权限允许时自动恢复；文件留在设备内。' : '本机曲库已缓存到此浏览器，下次打开可自动恢复。清理浏览器存储会移除缓存。');
-    else setCacheStatus(`本次缓存未完成，当前仍可播放；上次完整缓存会保留。${result.reason || '浏览器存储暂不可用。'}`,true);
+    if (result.status === 'saved') setCacheStatus(result.mode === 'handle' ? '已记住本机目录' : '已缓存在当前浏览器');
+    else setCacheStatus(`缓存未完成，当前仍可播放。${result.reason || ''}`,true);
   } catch {
-    if (request === cacheSaveRequest && !controller.signal.aborted) setCacheStatus('本次缓存未完成，当前仍可播放；上次完整缓存会保留。请检查浏览器存储空间与权限。',true);
+    if (request === cacheSaveRequest && !controller.signal.aborted) setCacheStatus('缓存未完成，当前仍可播放。',true);
   }
 }
 
@@ -1134,7 +1134,7 @@ async function restoreLocalLibrary(requestPermission = false,expectedImport = im
   if (expectedImport !== importRequest) return;
   const request=++cacheRestoreRequest;
   elements.restoreLibraryButton.disabled=true;
-  setCacheStatus('正在恢复本机曲库缓存…');
+  setCacheStatus('正在恢复本机曲库…');
   try {
     const result=await localCache.restore({requestPermission});
     if (request !== cacheRestoreRequest || expectedImport !== importRequest) return;
@@ -1142,21 +1142,21 @@ async function restoreLocalLibrary(requestPermission = false,expectedImport = im
       const restored=await importFolder(result.files,false,{restored:true,isCurrent:()=>request === cacheRestoreRequest});
       if (restored && request === cacheRestoreRequest) {
         rememberedWorks=[];elements.restoreLibraryButton.hidden=true;
-        setCacheStatus(`已从此浏览器恢复 ${localLibrary.counts.works} 部作品、${localLibrary.counts.tracks} 个音轨；文件仍留在设备内。`);
+        setCacheStatus(`已从此浏览器恢复 ${localLibrary.counts.works} 部作品 · ${localLibrary.counts.tracks} 条音轨`);
         renderLibrary();
         return true;
       }
     } else if (result.status === 'permission-required') {
       rememberedWorks=result.summary?.works ?? [];
       elements.restoreLibraryButton.hidden=false;
-      setCacheStatus('已记住本机曲库。点击“恢复曲库访问”授权后即可播放，无需重新添加作品。');
-      elements.importStatus.textContent=`已记住 ${rememberedWorks.length} 部本机作品。打开左上角作品库，点击“恢复曲库访问”。`;
+      setCacheStatus('点击“恢复曲库访问”即可继续播放');
+      elements.importStatus.textContent=`已记住 ${rememberedWorks.length} 部本机作品，打开作品库恢复访问`;
       renderLibrary();
     } else if (result.status === 'empty') {
-      setCacheStatus('本机缓存仅保存在此浏览器，不上传媒体。选择文件后自动保存可恢复的曲库。');
-    } else setCacheStatus(result.reason || '此浏览器暂时无法恢复本机缓存。仍可重新选择曲库播放。',true);
+      setCacheStatus('仅保存在当前浏览器，不上传文件');
+    } else setCacheStatus(result.reason || '本机缓存暂不可用，请重新选择曲库',true);
   } catch {
-    if (request === cacheRestoreRequest) setCacheStatus('本机缓存暂时无法读取。仍可重新选择曲库播放；原完整缓存会保留。',true);
+    if (request === cacheRestoreRequest) setCacheStatus('本机缓存暂不可读取，请重新选择曲库',true);
   } finally {
     if (request === cacheRestoreRequest) elements.restoreLibraryButton.disabled=false;
   }

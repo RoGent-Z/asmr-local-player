@@ -1,7 +1,7 @@
 export const DEFAULT_SPECTRUM_PALETTE = Object.freeze([
-  '#ff78a8',
-  '#a77bff',
-  '#78d7ff',
+  '#e283a2',
+  '#b983d8',
+  '#f2ceda',
 ]);
 
 export function getSpectrumChannelPlan(paired, listeningMode = 'binaural') {

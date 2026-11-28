@@ -52,7 +52,7 @@ export function createBackgroundPicker({ onOpenChange = () => {}, onError = () =
     }
     if (!candidates.length) {
       const empty = document.createElement('p'); empty.className = 'field-help';
-      empty.textContent = '这部作品中没有可用图片。将图片放入作品文件夹，再重新选择曲库即可。'; gallery.append(empty);
+      empty.textContent = '暂无可用背景图片'; gallery.append(empty);
     }
     if (!dialog.open) { dialog.showModal(); gallery.scrollTop = 0; onOpenChange(true); }
   }

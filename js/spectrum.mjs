@@ -7,7 +7,7 @@ import {
   getSpectrumChannelPlan,
   hasSpectrumEnergy,
   mergeSpectrumData,
-} from './spectrum-data.mjs';
+} from './spectrum-data.mjs?v=0.1.7';
 
 const IDLE_LEVEL = 0.08;
 const ACTIVE_FLOOR = 0.12;
