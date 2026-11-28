@@ -1,7 +1,7 @@
 import {buildFoliaTimeline, foliaFrameAt} from './folia-timeline.mjs';
-import {createFoliaScene} from './folia-scene.mjs?v=0.1.7-velvet';
+import {createFoliaScene} from './folia-scene.mjs?v=0.1.8-velvet';
 import {segmentFoliaText,foliaGlyphFrame} from './folia-glyphs.mjs';
-import {createFoliaBackdrop,DEFAULT_FOLIA_PALETTE,deriveUiTheme} from './folia-theme.mjs?v=0.1.7-velvet';
+import {createFoliaBackdrop,DEFAULT_FOLIA_PALETTE,deriveUiTheme} from './folia-theme.mjs?v=0.1.8-velvet';
 
 const PREFERENCE_KEY='asmr-player:folia:v1';
 
@@ -29,11 +29,19 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
       root.style.setProperty('--ui-surface',ui.surface);
       root.style.setProperty('--ui-surface-hi',ui.surfaceHi);
       root.style.setProperty('--ui-accent',ui.accent);
+      root.style.setProperty('--ui-glow',ui.glow);
       root.style.setProperty('--ui-light',ui.light);
       root.style.setProperty('--ui-echo',ui.echo);
       root.style.setProperty('--ui-fill',ui.fill);
       root.style.setProperty('--ui-fill-deep',ui.fillDeep);
       root.dataset.uiAdaptive=withImage?'image':'default';
+    }
+    if(app?.style){
+      for(const key of ['accent','glow','light','echo','star','deep']){
+        const value=key==='glow'?ui.glow:nextPalette[key];
+        if(value)app.style.setProperty(`--folia-${key==='accent'?'tint':key}`,value);
+      }
+      ui.echo.split(',').map(Number).forEach((value,index)=>app.style.setProperty(`--folia-glyph-${['r','g','b'][index]}`,String(Math.round(value*.65+255*.25))));
     }
   };
   applyAdaptiveUi(palette,false);
@@ -41,8 +49,6 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
     palette=state.palette;hasBackground=state.hasBackground;
     applyAdaptiveUi(palette,hasBackground);
     app.classList.toggle('folia-image',hasBackground);app.dataset.foliaTheme=state.status;
-    for(const key of ['accent','light','echo','star','deep'])app.style.setProperty(`--folia-${key==='accent'?'tint':key}`,palette[key]);
-    palette.echo.split(',').map(Number).forEach((value,index)=>app.style.setProperty(`--folia-glyph-${['r','g','b'][index]}`,String(Math.round(value*.65+255*.25))));
     if(active)update(time,{force:true});
   }});
   try {preferred=storage?.getItem(PREFERENCE_KEY)==='true';} catch { /* Restricted storage: this visit still works. */ }
@@ -81,9 +87,10 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
     syncVisibility();onInteraction();
     if(restore)restoreFocus();
   }
-  function makeLine(item,state) {
+  function makeLine(item,state,distance=0) {
     const line=doc.createElement('button');line.type='button';line.className='folia-line';
     line.dataset.foliaId=item.id;line.dataset.side=item.side;line.dataset.phase=state;
+    if(distance>0)line.dataset.distance=String(distance);
     if(item.text.length>180)line.dataset.density='long';
     line.title=`${Math.floor(item.start/60)}:${String(Math.floor(item.start%60)).padStart(2,'0')} · 点击跳转`;
     if(state==='active')line.setAttribute('aria-current','true');
@@ -104,13 +111,13 @@ export function createFoliaView({app,button,stage,onSeek,onInteraction=()=>{},st
     time=Number.isFinite(nextTime)?Math.max(0,nextTime):0;
     if(!active)return;
     const reducedMotion=motion.matches;
-    const frame=foliaFrameAt(timeline,time,{context:1});
+    const frame=foliaFrameAt(timeline,time,{context:2});
     const nextSignature=JSON.stringify([frame.before.map(x=>x.id),frame.active.map(x=>x.id),frame.after.map(x=>x.id)]);
     if(nextSignature!==signature){
       const focusId=stage.contains(doc.activeElement)?doc.activeElement.dataset.foliaId:null;
-      before.replaceChildren(...frame.before.map(x=>makeLine(x,'before')));
-      current.replaceChildren(...frame.active.map(x=>makeLine(x,'active')));
-      after.replaceChildren(...frame.after.map(x=>makeLine(x,'after')));
+      before.replaceChildren(...frame.before.map((x,index)=>makeLine(x,'before',frame.before.length-index)));
+      current.replaceChildren(...frame.active.map(x=>makeLine(x,'active',0)));
+      after.replaceChildren(...frame.after.map((x,index)=>makeLine(x,'after',index+1)));
       current.scrollTop=0;
       activeNodes=[...current.children];
       stage.dataset.duet=String(new Set(frame.active.map(x=>x.side)).size>1);

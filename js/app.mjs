@@ -3,7 +3,7 @@ import { buildTrackPlayback } from './playback-mode.mjs';
 import { createAiWorkbench } from './ai-workbench.mjs?v=0.1.7';
 import { createBackgroundPicker } from './background.mjs?v=0.1.7';
 import { createCoverPicker } from './cover-picker.mjs?v=0.1.7';
-import { createFoliaView } from './folia-view.mjs?v=0.1.7-velvet';
+import { createFoliaView } from './folia-view.mjs?v=0.1.8-velvet';
 import { createLocalWorkbench } from './local-workbench.mjs?v=0.1.5';
 import { displaySourceCues, mergeTranscriptDocuments } from './transcript.mjs';
 import {
@@ -33,7 +33,7 @@ import {
   semanticFrameAt,
   trackProfileKey,
 } from './semantic-visuals.mjs';
-import { createSpectrumRenderer } from './spectrum.mjs?v=0.1.7';
+import { createSpectrumRenderer } from './spectrum.mjs?v=0.1.8';
 import { assignSourceIdentity, decodeSubtitleBytes, parseSubtitle } from './subtitles.mjs';
 
 const appVersion = document.querySelector('meta[name="app-version"]').content;

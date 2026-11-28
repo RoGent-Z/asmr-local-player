@@ -1,7 +1,7 @@
 export const DEFAULT_SPECTRUM_PALETTE = Object.freeze([
-  '#e283a2',
-  '#b983d8',
-  '#f2ceda',
+  '#ff4d84',
+  '#c94be0',
+  '#ffd2e4',
 ]);
 
 export function getSpectrumChannelPlan(paired, listeningMode = 'binaural') {
@@ -218,11 +218,34 @@ export function extractRepresentativeColors(imageData, limit = 5) {
   if (selected.length === 0) return [...DEFAULT_SPECTRUM_PALETTE];
 
   const colors = selected.map(({ r, g, b }) => toHex(r, g, b));
-  for (const fallback of DEFAULT_SPECTRUM_PALETTE) {
-    if (colors.length >= Math.min(3, limit)) break;
-    const [r, g, b] = hexToRgb(fallback);
-    if (selected.every((color) => colorDistance(color, { r, g, b }) >= 48)) {
-      colors.push(fallback);
+  const targetCount = Math.min(3, limit);
+  if (colors.length < targetCount) {
+    const anchor = selected[0];
+    const { hue, saturation, lightness } = rgbToHsl(anchor.r, anchor.g, anchor.b);
+    const companionSpecs = [
+      {
+        hue: (hue - 22 + 360) % 360,
+        saturation: Math.min(0.92, Math.max(0.38, saturation * 1.04)),
+        lightness: Math.min(0.74, Math.max(0.46, lightness + 0.14)),
+      },
+      {
+        hue: (hue + 24) % 360,
+        saturation: Math.min(0.88, Math.max(0.32, saturation * 0.88)),
+        lightness: Math.min(0.82, Math.max(0.54, lightness + 0.24)),
+      },
+      {
+        hue: (hue + 10) % 360,
+        saturation: Math.min(0.9, Math.max(0.36, saturation)),
+        lightness: Math.min(0.68, Math.max(0.34, lightness - 0.12)),
+      },
+    ];
+    for (const spec of companionSpecs) {
+      if (colors.length >= targetCount) break;
+      const [r, g, b] = hslToRgb(spec.hue, spec.saturation, spec.lightness);
+      const candidateHex = toHex(r, g, b);
+      if (!colors.includes(candidateHex)) {
+        colors.push(candidateHex);
+      }
     }
   }
   return colors.slice(0, limit);
@@ -260,7 +283,7 @@ function rgbString(values) {
 
 function parseRgbString(color) {
   const values = String(color).match(/\d+/g)?.map(Number) ?? [];
-  return values.length >= 3 ? values.slice(0, 3) : hexToRgb('#ff78a8');
+  return values.length >= 3 ? values.slice(0, 3) : hexToRgb(DEFAULT_SPECTRUM_PALETTE[0]);
 }
 
 export function normalizeDisplayColor(color) {

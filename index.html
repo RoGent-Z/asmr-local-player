@@ -8,11 +8,11 @@
   <meta name="stream-resolver" content="https://asmr-player-resolver.navyelf7.chatgpt.site">
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://asmr-player-resolver.navyelf7.chatgpt.site https://kiko-play-niptan.one https://*.kiko-play-niptan.one; media-src 'self' blob: https:; connect-src 'self' blob: https:; object-src 'none'; base-uri 'none'; form-action 'none'">
-  <meta name="app-version" content="0.1.7">
-  <meta name="app-build" content="v017-velvet">
+  <meta name="app-version" content="0.1.8">
+  <meta name="app-build" content="v018-velvet-folia">
   <title>ASMR 原声播放器</title>
   <link rel="icon" type="image/png" sizes="128x128" href="./favicon.png?v=4">
-  <link rel="stylesheet" href="./styles.css?build=v017-velvet">
+  <link rel="stylesheet" href="./styles.css?build=v018-velvet-folia">
 </head>
 <body>
   <main id="app" class="app">
@@ -59,63 +59,106 @@
           <div class="welcome-art" aria-hidden="true">
             <svg class="welcome-1999-ornament" viewBox="0 0 600 420" preserveAspectRatio="xMidYMid slice" focusable="false">
               <defs>
-                <radialGradient id="velvetStageGlow" cx="50%" cy="46%" r="68%">
-                  <stop offset="0%" stop-color="#4e233b" stop-opacity="0.58"/>
-                  <stop offset="52%" stop-color="#221428" stop-opacity="0.78"/>
-                  <stop offset="100%" stop-color="#100b14" stop-opacity="1"/>
+                <radialGradient id="velvetStageGlow" cx="50%" cy="48%" r="72%">
+                  <stop offset="0%" stop-color="#4d1130" stop-opacity="0.72" style="stop-color: rgb(var(--ui-deep, 34, 11, 28))"/>
+                  <stop offset="48%" stop-color="#1c0716" stop-opacity="0.88" style="stop-color: rgb(var(--ui-surface, 21, 9, 24))"/>
+                  <stop offset="100%" stop-color="#09040d" stop-opacity="1" style="stop-color: rgb(var(--ui-bg, 11, 5, 16))"/>
                 </radialGradient>
-              </defs>
-              <rect width="600" height="420" fill="url(#velvetStageGlow)"/>
-              <!-- Soft twilight rose rain filaments -->
-              <g stroke="#f0bfd0" stroke-width="0.75" opacity="0.18">
-                <line x1="92" y1="0" x2="36" y2="168"/>
-                <line x1="168" y1="0" x2="96" y2="216"/>
-                <line x1="252" y1="24" x2="176" y2="252"/>
-                <line x1="418" y1="0" x2="352" y2="198"/>
-                <line x1="510" y1="18" x2="432" y2="252"/>
-                <line x1="572" y1="90" x2="488" y2="342"/>
-                <line x1="138" y1="230" x2="78" y2="410"/>
-              </g>
-              <!-- Delicate rose-champagne astrolabe orbital geometry -->
-              <g fill="none" stroke="#dc92ae">
-                <circle cx="294" cy="210" r="192" stroke-width="0.9" opacity="0.32"/>
-                <circle cx="294" cy="210" r="176" stroke-width="0.8" stroke-dasharray="2 8" opacity="0.46"/>
-                <circle cx="294" cy="210" r="154" stroke-width="0.7" opacity="0.22"/>
-                <line x1="24" y1="210" x2="576" y2="210" stroke-width="0.65" opacity="0.22"/>
-                <line x1="294" y1="14" x2="294" y2="406" stroke-width="0.65" opacity="0.22"/>
-                <path d="M106 210 L122 210 M466 210 L482 210 M294 22 L294 38 M294 382 L294 398" stroke-width="1.3" opacity="0.6"/>
-              </g>
-            </svg>
-            <svg class="welcome-star welcome-star-tl" viewBox="0 0 36 36" focusable="false">
-              <path d="M18 1 C18.9 12.2 23.8 17.1 35 18 C23.8 18.9 18.9 23.8 18 35 C17.1 23.8 12.2 18.9 1 18 C12.2 17.1 17.1 12.2 18 1 Z" fill="#fce4ec"/>
-            </svg>
-            <svg class="welcome-star welcome-star-br" viewBox="0 0 28 28" focusable="false">
-              <path d="M14 1 C14.7 9.6 18.4 13.3 27 14 C18.4 14.7 14.7 18.4 14 27 C13.3 18.4 9.6 14.7 1 14 C9.6 13.3 13.3 9.6 14 1 Z" fill="#e59db7"/>
-            </svg>
-            <div class="welcome-disc"></div>
-            <svg class="welcome-tonearm" viewBox="0 0 120 220" focusable="false">
-              <defs>
-                <linearGradient id="velvetArmGold" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stop-color="#fbe0e9"/>
-                  <stop offset="55%" stop-color="#dc96b0"/>
-                  <stop offset="100%" stop-color="#965671"/>
+                <radialGradient id="velvetCrimsonBloom" cx="46%" cy="50%" r="42%">
+                  <stop offset="0%" stop-color="#ff5692" stop-opacity="0.34" style="stop-color: rgb(var(--ui-glow, 255, 86, 146))"/>
+                  <stop offset="56%" stop-color="#f6447c" stop-opacity="0.1" style="stop-color: rgb(var(--ui-accent, 246, 68, 124))"/>
+                  <stop offset="100%" stop-color="#0b0510" stop-opacity="0"/>
+                </radialGradient>
+                <linearGradient id="velvetRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#ffe8f2" stop-opacity="0.72" style="stop-color: rgb(var(--ui-light, 255, 232, 242))"/>
+                  <stop offset="52%" stop-color="#ec7ca8" stop-opacity="0.42" style="stop-color: rgb(var(--ui-echo, 236, 124, 168))"/>
+                  <stop offset="100%" stop-color="#f6447c" stop-opacity="0.6" style="stop-color: rgb(var(--ui-accent, 246, 68, 124))"/>
                 </linearGradient>
               </defs>
-              <circle cx="88" cy="30" r="18" fill="#17101d" stroke="url(#velvetArmGold)" stroke-width="2"/>
-              <circle cx="88" cy="30" r="9" fill="none" stroke="#dc92ae" stroke-width="1" opacity="0.55"/>
-              <circle cx="88" cy="30" r="4.5" fill="#f5ccd9"/>
-              <path d="M88 30 L56 168 L28 196" fill="none" stroke="rgba(12,7,16,.72)" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M88 30 L56 168 L28 196" fill="none" stroke="url(#velvetArmGold)" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
-              <polygon points="24,188 36,200 20,210 13,202" fill="#f2c4d4" stroke="#130c18" stroke-width="1.5"/>
+              <rect width="600" height="420" fill="url(#velvetStageGlow)"/>
+              <rect width="600" height="420" fill="url(#velvetCrimsonBloom)"/>
+              <!-- Soft crimson-silk twilight rain filaments -->
+              <g stroke="#ffd2e4" stroke-width="0.7" opacity="0.16">
+                <line x1="88" y1="0" x2="30" y2="174"/>
+                <line x1="164" y1="0" x2="92" y2="220"/>
+                <line x1="252" y1="20" x2="176" y2="254"/>
+                <line x1="420" y1="0" x2="350" y2="202"/>
+                <line x1="514" y1="14" x2="432" y2="256"/>
+                <line x1="576" y1="84" x2="488" y2="346"/>
+                <line x1="136" y1="226" x2="74" y2="414"/>
+              </g>
+              <!-- Liquid rose-gold astrolabe orbital geometry -->
+              <g fill="none" stroke="url(#velvetRingGrad)">
+                <circle cx="288" cy="210" r="196" stroke-width="0.95" opacity="0.42"/>
+                <circle cx="288" cy="210" r="180" stroke-width="0.85" stroke-dasharray="2 7" opacity="0.58"/>
+                <circle cx="288" cy="210" r="158" stroke-width="0.7" opacity="0.28"/>
+                <line x1="20" y1="210" x2="580" y2="210" stroke-width="0.65" opacity="0.24"/>
+                <line x1="288" y1="12" x2="288" y2="408" stroke-width="0.65" opacity="0.24"/>
+                <path d="M96 210 L116 210 M460 210 L480 210 M288 18 L288 38 M288 382 L288 402" stroke-width="1.4" opacity="0.72"/>
+              </g>
+              <!-- Corner hairline brackets -->
+              <g fill="none" stroke="#ffe8f2" stroke-width="1.1" opacity="0.34">
+                <path d="M18 34 L18 18 L34 18"/>
+                <path d="M566 18 L582 18 L582 34"/>
+                <path d="M18 386 L18 402 L34 402"/>
+                <path d="M566 402 L582 402 L582 386"/>
+              </g>
+            </svg>
+            <div class="welcome-bokeh">
+              <span></span><span></span><span></span><span></span><span></span><span></span>
+            </div>
+            <svg class="welcome-star welcome-star-tl" viewBox="0 0 36 36" focusable="false">
+              <path d="M18 1 C18.9 12.2 23.8 17.1 35 18 C23.8 18.9 18.9 23.8 18 35 C17.1 23.8 12.2 18.9 1 18 C12.2 17.1 17.1 12.2 18 1 Z" fill="#fff0f6"/>
+            </svg>
+            <svg class="welcome-star welcome-star-br" viewBox="0 0 28 28" focusable="false">
+              <path d="M14 1 C14.7 9.6 18.4 13.3 27 14 C18.4 14.7 14.7 18.4 14 27 C13.3 18.4 9.6 14.7 1 14 C9.6 13.3 13.3 9.6 14 1 Z" fill="#ff9cc0"/>
+            </svg>
+            <div class="welcome-disc-halo"></div>
+            <div class="welcome-disc">
+              <div class="welcome-disc-sheen"></div>
+              <div class="welcome-disc-label"></div>
+            </div>
+            <svg class="welcome-tonearm" viewBox="0 0 132 236" focusable="false">
+              <defs>
+                <linearGradient id="velvetArmGold" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#fff1f7"/>
+                  <stop offset="32%" stop-color="#f7bfd4"/>
+                  <stop offset="68%" stop-color="#d8759b"/>
+                  <stop offset="100%" stop-color="#7c2d4e"/>
+                </linearGradient>
+                <linearGradient id="velvetArmSpec" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.92"/>
+                  <stop offset="100%" stop-color="#ff8ab5" stop-opacity="0.2"/>
+                </linearGradient>
+                <radialGradient id="velvetPivotJewel" cx="36%" cy="32%" r="65%">
+                  <stop offset="0%" stop-color="#fff4f9"/>
+                  <stop offset="38%" stop-color="#ff5692"/>
+                  <stop offset="100%" stop-color="#5d0e2f"/>
+                </radialGradient>
+              </defs>
+              <!-- Gimbal base plate -->
+              <circle cx="94" cy="34" r="22" fill="#130616" stroke="url(#velvetArmGold)" stroke-width="2.1"/>
+              <circle cx="94" cy="34" r="14.5" fill="#200a21" stroke="#f7bfd4" stroke-width="0.9" opacity="0.65"/>
+              <circle cx="94" cy="34" r="6.2" fill="url(#velvetPivotJewel)"/>
+              <!-- Counterweight collar -->
+              <rect x="94" y="10" width="11" height="15" rx="3" transform="rotate(14 99 17)" fill="url(#velvetArmGold)" stroke="#120514" stroke-width="1"/>
+              <!-- Sculpted arm shadow + rose-gold wand + specular edge -->
+              <path d="M94 34 L62 174 L30 206" fill="none" stroke="rgba(7, 2, 10, .82)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M94 34 L62 174 L30 206" fill="none" stroke="url(#velvetArmGold)" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M93.2 33.4 L61.2 173.4 L29.4 205.2" fill="none" stroke="url(#velvetArmSpec)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+              <!-- Headshell cartridge with crimson jewel accent -->
+              <polygon points="24,196 38,209 21,223 11,213" fill="url(#velvetArmGold)" stroke="#120514" stroke-width="1.5"/>
+              <line x1="25" y1="204" x2="18" y2="212" stroke="#ff5692" stroke-width="2.2" stroke-linecap="round"/>
+              <path d="M36 206 L44 203" stroke="#ffe8f2" stroke-width="1.4" stroke-linecap="round"/>
             </svg>
             <div class="welcome-wave">
-              <i style="--level:12%"></i><i style="--level:22%"></i><i style="--level:16%"></i>
-              <i style="--level:34%"></i><i style="--level:58%"></i><i style="--level:86%"></i>
-              <i style="--level:46%"></i><i style="--level:26%"></i><i style="--level:36%"></i>
-              <i style="--level:18%"></i><i style="--level:44%"></i><i style="--level:76%"></i>
-              <i class="wave-peak" style="--level:100%"></i><i style="--level:54%"></i><i style="--level:28%"></i>
-              <i style="--level:40%"></i><i style="--level:62%"></i><i style="--level:34%"></i>
-              <i style="--level:18%"></i><i style="--level:24%"></i><i style="--level:12%"></i>
+              <i style="--level:14%"></i><i style="--level:24%"></i><i style="--level:18%"></i>
+              <i style="--level:36%"></i><i style="--level:60%"></i><i style="--level:88%"></i>
+              <i style="--level:48%"></i><i style="--level:28%"></i><i style="--level:38%"></i>
+              <i style="--level:20%"></i><i style="--level:46%"></i><i style="--level:78%"></i>
+              <i class="wave-peak" style="--level:100%"></i><i style="--level:56%"></i><i style="--level:30%"></i>
+              <i style="--level:42%"></i><i style="--level:64%"></i><i style="--level:36%"></i>
+              <i style="--level:20%"></i><i style="--level:26%"></i><i style="--level:14%"></i>
             </div>
             <div class="welcome-art-tag">SIDE A · WHISPER</div>
           </div>
@@ -347,6 +390,6 @@
     </div>
     <div class="stream-footer"><button id="streamCancel" class="text-button" type="button" disabled>取消任务</button></div>
   </dialog>
-  <script type="module" src="./js/app.mjs?v=0.1.7&amp;build=v017-velvet"></script>
+  <script type="module" src="./js/app.mjs?v=0.1.8&amp;build=v018-velvet-folia"></script>
 </body>
 </html>
